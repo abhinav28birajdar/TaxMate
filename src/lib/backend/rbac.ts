@@ -1,14 +1,74 @@
-import { HttpError } from './errors';
+import { getServiceClient } from './supabase';
+import { forbidden } from './errors';
 
-export const PERMISSIONS = {
-  READ: 'read',
-  WRITE: 'write',
-  UPDATE: 'update',
-  DELETE: 'delete',
-} as const;
+export async function getUserRoles(userId: string): Promise<string[]> {
+  const client = getServiceClient();
 
-export function ensureRole(role: string, allowed: string[]) {
-  if (!allowed.includes(role)) {
-    throw new HttpError('Forbidden', 403, 'FORBIDDEN');
+  const { data, error } = await client
+    .from('user_roles')
+    .select('roles(name)')
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error fetching user roles:', error);
+    return [];
   }
+
+  return data?.map((ur: any) => ur.roles?.name).filter(Boolean) || [];
+}
+
+export async function hasRole(userId: string, roleName: string): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  return roles.includes(roleName);
+}
+
+export async function hasPermission(userId: string, resource: string, action: string): Promise<boolean> {
+  const client = getServiceClient();
+
+  const { data, error } = await client
+    .from('user_roles')
+    .select(
+      `
+      role_id,
+      roles!inner(
+        role_permissions(
+          permission_id,
+          permissions!inner(resource, action)
+        )
+      )
+    `
+    )
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !data) {
+    return false;
+  }
+
+  return true;
+}
+
+export async function requireRole(userId: string, ...roleNames: string[]): Promise<void> {
+  const roles = await getUserRoles(userId);
+  const hasRequiredRole = roleNames.some((role) => roles.includes(role));
+
+  if (!hasRequiredRole) {
+    throw forbidden(`Requires one of these roles: ${roleNames.join(', ')}`);
+  }
+}
+
+export async function requirePermission(userId: string, resource: string, action: string): Promise<void> {
+  const hasPermission = await hasPermission(userId, resource, action);
+
+  if (!hasPermission) {
+    throw forbidden(`Missing permission: ${resource}:${action}`);
+  }
+}
+
+export async function isAdmin(userId: string): Promise<boolean> {
+  return hasRole(userId, 'admin');
+}
+
+export async function isSuperAdmin(userId: string): Promise<boolean> {
+  return hasRole(userId, 'super_admin');
 }

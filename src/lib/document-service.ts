@@ -5,41 +5,42 @@ export const documentService = {
   async uploadDocument(data: {
     clientId: string
     caId: string
-    fileName: string
+    uploadedById: string
+    name: string
+    originalName: string
+    type: string
     fileSize: number
-    fileType: string
     fileUrl: string
-    category: 'GST' | 'ITR' | 'BANK' | 'BUSINESS' | 'PERSONAL' | 'OTHER'
-    expiryDate?: Date
+    fileKey: string
+    mimeType?: string
     description?: string
   }) {
     return prisma.document.create({
       data: {
         clientId: data.clientId,
         caId: data.caId,
-        fileName: data.fileName,
+        uploadedById: data.uploadedById,
+        name: data.name,
+        originalName: data.originalName,
+        type: data.type,
         fileSize: data.fileSize,
-        fileType: data.fileType,
         fileUrl: data.fileUrl,
-        category: data.category,
-        expiryDate: data.expiryDate,
+        fileKey: data.fileKey,
+        mimeType: data.mimeType,
         description: data.description,
         version: 1,
-        status: 'ACTIVE',
       },
     })
   },
 
   // Get documents by client
   async getDocumentsByClient(clientId: string, filters?: {
-    category?: string
-    status?: string
+    type?: string
     skip?: number
     take?: number
   }) {
-    const where: any = { clientId }
-    if (filters?.category) where.category = filters.category
-    if (filters?.status) where.status = filters.status
+    const where: any = { clientId, isDeleted: false }
+    if (filters?.type) where.type = filters.type
 
     const documents = await prisma.document.findMany({
       where,
@@ -74,34 +75,28 @@ export const documentService = {
     })
   },
 
-  // Get expiring documents
-  async getExpiringDocuments(caId: string, daysUntilExpiry: number = 30) {
-    const expiryDate = new Date()
-    expiryDate.setDate(expiryDate.getDate() + daysUntilExpiry)
-
+  // Get recently updated documents
+  async getRecentDocuments(caId: string, limit: number = 30) {
     return prisma.document.findMany({
       where: {
         caId,
-        expiryDate: {
-          lte: expiryDate,
-          gt: new Date(),
-        },
-        status: 'ACTIVE',
+        isDeleted: false,
       },
       include: {
         client: true,
       },
-      orderBy: { expiryDate: 'asc' },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
     })
   },
 
-  // Get documents by category
-  async getDocumentsByCategory(clientId: string, category: string) {
+  // Get documents by type
+  async getDocumentsByType(clientId: string, type: string) {
     return prisma.document.findMany({
       where: {
         clientId,
-        category,
-        status: 'ACTIVE',
+        type,
+        isDeleted: false,
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -110,8 +105,10 @@ export const documentService = {
   // Create document version
   async createDocumentVersion(originalDocId: string, data: {
     fileUrl: string
+    fileKey: string
     fileSize: number
     description?: string
+    uploadedById: string
   }) {
     const original = await prisma.document.findUnique({
       where: { id: originalDocId },
@@ -122,16 +119,16 @@ export const documentService = {
       data: {
         clientId: original.clientId,
         caId: original.caId,
-        fileName: original.fileName,
+        uploadedById: data.uploadedById,
+        name: original.name,
+        originalName: original.originalName,
+        type: original.type,
         fileSize: data.fileSize,
-        fileType: original.fileType,
         fileUrl: data.fileUrl,
-        category: original.category,
-        expiryDate: original.expiryDate,
+        fileKey: data.fileKey,
+        mimeType: original.mimeType,
         description: data.description,
         version: original.version + 1,
-        status: 'ACTIVE',
-        parentDocumentId: originalDocId,
       },
     })
   },
@@ -141,8 +138,8 @@ export const documentService = {
     const documents = await prisma.document.findMany({ where: { caId } })
     
     const totalSize = documents.reduce((sum, doc) => sum + (doc.fileSize || 0), 0)
-    const byCategory = documents.reduce((acc: any, doc) => {
-      acc[doc.category] = (acc[doc.category] || 0) + 1
+    const byType = documents.reduce((acc: any, doc) => {
+      acc[doc.type] = (acc[doc.type] || 0) + 1
       return acc
     }, {})
 
@@ -150,15 +147,18 @@ export const documentService = {
       totalDocuments: documents.length,
       totalSizeBytes: totalSize,
       totalSizeMB: Math.round(totalSize / 1024 / 1024),
-      byCategory,
+      byType,
     }
   },
 
   // Share document
-  async shareDocument(documentId: string, sharedWith: string[]) {
+  async shareDocument(documentId: string, sharedWithClient: boolean = true) {
     return prisma.document.update({
       where: { id: documentId },
-      data: { sharedWith },
+      data: { 
+        isSharedWithClient: sharedWithClient,
+        sharedAt: sharedWithClient ? new Date() : null,
+      },
     })
   },
 }

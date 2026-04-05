@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { useAuth } from '@/context/AuthHook';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 
 type UserRole = 'customer' | 'ca' | 'business' | 'any';
 

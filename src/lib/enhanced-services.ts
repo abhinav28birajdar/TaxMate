@@ -271,7 +271,7 @@ export const RecurringInvoiceService = {
   // Generate invoices from recurring templates
   generateRecurringInvoices: async (caId: string) => {
     // Generate invoices based on next due date
-    const invoices = [];
+    const invoices: any[] = [];
     // TODO: Generate and save
     return invoices;
   },
@@ -507,7 +507,7 @@ export const SmartNotifications = {
   // Send auto-alerts
   sendAutoAlerts: async (caId: string) => {
     // Check due dates and send notifications
-    const alerts = [];
+    const alerts: any[] = [];
     // TODO: Generate and send alerts
     return alerts;
   },

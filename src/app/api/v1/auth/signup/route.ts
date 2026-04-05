@@ -1,38 +1,44 @@
 import { NextRequest } from 'next/server';
-import { signupSchema } from '@/lib/backend/validation';
-import { fail, ok } from '@/lib/backend/response';
-import { signup } from '@/lib/backend/auth-service';
-import { enforceRateLimit } from '@/lib/backend/rate-limit';
-import { writeAuditLog } from '@/lib/backend/audit';
+import { signupSchema, validateBody } from '@/lib/backend/validation';
+import { errorResponse, successResponse } from '@/lib/backend/response';
+import { signup } from '@/lib/backend/auth-service-new';
+import { rateLimitPresets } from '@/lib/backend/rate-limit';
+import { getIpAddress } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || 'unknown';
-    enforceRateLimit(`signup:${ip}`, 10, 60_000);
+    const ip = getIpAddress(request);
 
-    const body = await request.json();
-    const parsed = signupSchema.parse(body);
+    // Rate limiting: 5 signup attempts per 15 minutes per IP
+    if (!rateLimitPresets.signupRateLimit(ip)) {
+      return errorResponse(
+        new Error('Too many signup attempts. Please try again in 15 minutes.'),
+        'Rate limit exceeded'
+      );
+    }
 
-    const result = await signup(parsed.email, parsed.password, parsed.name);
+    // Validate input
+    const body = await validateBody(signupSchema, request);
 
-    await writeAuditLog({
-      userId: result.user.id,
-      action: 'AUTH_SIGNUP',
-      entityType: 'user',
-      entityId: result.user.id,
-      ipAddress: ip,
-      metadata: { email: result.user.email },
+    // Register user
+    const result = await signup({
+      email: body.email,
+      password: body.password,
+      fullName: body.fullName,
     });
 
-    return ok(
+    return successResponse(
       {
-        user: result.user,
-        verificationToken: result.verificationToken,
+        userId: result.userId,
+        email: result.email,
       },
-      'Signup successful',
+      'Account created successfully',
       201
     );
   } catch (error) {
-    return fail(error);
+    return errorResponse(
+      error instanceof Error ? error : new Error('Signup failed'),
+      'Signup failed'
+    );
   }
 }

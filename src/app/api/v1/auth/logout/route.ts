@@ -1,24 +1,31 @@
 import { NextRequest } from 'next/server';
-import { fail, ok } from '@/lib/backend/response';
-import { requireAuth } from '@/lib/backend/supabase';
-import { logout } from '@/lib/backend/auth-service';
-import { writeAuditLog } from '@/lib/backend/audit';
+import { errorResponse, successResponse } from '@/lib/backend/response';
+import { authGuard } from '@/lib/backend/supabase';
+import { logout } from '@/lib/backend/auth-service-new';
+import { logActivity } from '@/lib/backend/audit';
+import { getIpAddress } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireAuth(request);
-    await logout(auth.sessionId);
+    // Require authentication
+    const user = await authGuard(request);
+    const ip = getIpAddress(request);
 
-    await writeAuditLog({
-      userId: auth.userId,
-      action: 'AUTH_LOGOUT',
-      entityType: 'session',
-      entityId: auth.sessionId,
-      ipAddress: request.headers.get('x-forwarded-for'),
-    });
+    // Logout user
+    await logout(user.userId, user.sessionId);
 
-    return ok({ sessionId: auth.sessionId }, 'Logout successful');
+    // Log activity
+    await logActivity(user.userId, 'logout', 'session', undefined, {}, ip);
+
+    return successResponse(
+      { message: 'Logout successful' },
+      'Logged out successfully',
+      200
+    );
   } catch (error) {
-    return fail(error);
+    return errorResponse(
+      error instanceof Error ? error : new Error('Logout failed'),
+      'Logout failed'
+    );
   }
 }

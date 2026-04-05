@@ -154,7 +154,7 @@ export default function ClientPortalPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Badge variant={doc.status === 'verified' ? 'success' : 'default'}>
+                  <Badge variant={doc.status === 'verified' ? 'success' : 'info'}>
                     {doc.status === 'verified' ? '✓ Verified' : '⏳ Pending'}
                   </Badge>
                   <Button className="text-indigo-600 hover:bg-indigo-50 px-3">Download</Button>
@@ -182,8 +182,8 @@ export default function ClientPortalPage() {
                       filing.status === 'completed'
                         ? 'success'
                         : filing.status === 'in_progress'
-                        ? 'default'
-                        : 'alert'
+                        ? 'info'
+                        : 'warning'
                     }
                   >
                     {filing.status === 'completed'
@@ -220,8 +220,8 @@ export default function ClientPortalPage() {
                       invoice.status === 'paid'
                         ? 'success'
                         : invoice.status === 'due'
-                        ? 'default'
-                        : 'alert'
+                        ? 'info'
+                        : 'warning'
                     }
                   >
                     {invoice.status === 'paid' ? '✓ Paid' : invoice.status === 'due' ? 'Due' : 'Overdue'}

@@ -63,6 +63,7 @@ export function hasPermission(userRole: string, permission: keyof typeof PERMISS
 import { useSession } from 'next-auth/react';
 export function usePermission(permission: keyof typeof PERMISSIONS): boolean {
     const { data: session } = useSession();
-    if (!session?.user?.role) return false;
-    return hasPermission(session.user.role, permission);
+    const userRole = (session?.user as any)?.role;
+    if (!userRole) return false;
+    return hasPermission(userRole, permission);
 }

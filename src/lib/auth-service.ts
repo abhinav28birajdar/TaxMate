@@ -32,7 +32,7 @@ export async function generateJWT(
   payload: Record<string, any>,
   expiresIn: string = '7d'
 ): Promise<string> {
-  return jwt.SignJWT(payload)
+  return new jwt.SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime(expiresIn)
     .sign(JWT_SECRET);
@@ -205,7 +205,7 @@ export function verify2FAToken(secret: string, token: string): boolean {
  * Create or update user session
  */
 export async function createUserSession(userId: string, ipAddress?: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const sessionToken = nanoid(32);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -231,7 +231,7 @@ export async function createUserSession(userId: string, ipAddress?: string) {
  * Validate user session
  */
 export async function validateUserSession(sessionToken: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('user_sessions')
@@ -255,7 +255,7 @@ export async function validateUserSession(sessionToken: string) {
  * Invalidate user session
  */
 export async function invalidateUserSession(sessionToken: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { error } = await supabase
     .from('user_sessions')
@@ -287,7 +287,7 @@ export async function createAuditLog(
   resourceId?: string,
   ipAddress?: string
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { error } = await supabase
     .from('audit_logs')
@@ -303,3 +303,133 @@ export async function createAuditLog(
     console.error('Failed to create audit log:', error);
   }
 }
+
+/**
+ * Auth Service Object - OTP Management
+ */
+export const authService = {
+  /**
+   * Send OTP to user email
+   */
+  async sendOTP(email: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const supabase = await createClient();
+
+      // Get user
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .eq('email', email)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found');
+      }
+
+      // Generate OTP
+      const otp = generateOTP();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Store OTP in verification_tokens table
+      const { error: tokenError } = await supabase
+        .from('verification_tokens')
+        .insert({
+          user_id: userData.id,
+          token: otp,
+          type: 'OTP',
+          expires_at: expiresAt.toISOString(),
+        });
+
+      if (tokenError) {
+        throw new Error('Failed to generate OTP');
+      }
+
+      // Send OTP email
+      const emailSent = await sendOTPEmail(email, userData.name, otp);
+      if (!emailSent) {
+        throw new Error('Failed to send OTP email');
+      }
+
+      // Log action
+      await createAuditLog(userData.id, 'OTP_SENT', 'AUTH');
+
+      return { success: true, message: 'OTP sent to email' };
+    } catch (error: any) {
+      console.error('Send OTP error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Verify OTP and return auth token
+   */
+  async verifyOTP(email: string, otp: string): Promise<{ user: any; token: string }> {
+    try {
+      const supabase = await createClient();
+
+      // Get user
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User not found');
+      }
+
+      // Verify OTP
+      const { data: tokenData, error: tokenError } = await supabase
+        .from('verification_tokens')
+        .select('*')
+        .eq('user_id', userData.id)
+        .eq('token', otp)
+        .eq('type', 'OTP')
+        .single();
+
+      if (tokenError || !tokenData) {
+        throw new Error('Invalid OTP');
+      }
+
+      // Check if token is expired
+      if (new Date(tokenData.expires_at) < new Date()) {
+        throw new Error('OTP has expired');
+      }
+
+      // Check if token is already used
+      if (tokenData.used) {
+        throw new Error('OTP has already been used');
+      }
+
+      // Mark OTP as used
+      const { error: updateError } = await supabase
+        .from('verification_tokens')
+        .update({ used: true, usedAt: new Date().toISOString() })
+        .eq('id', tokenData.id);
+
+      if (updateError) {
+        throw new Error('Failed to verify OTP');
+      }
+
+      // Generate JWT token
+      const token = await generateJWT({ userId: userData.id, email: userData.email });
+
+      // Create session
+      const sessionToken = await createUserSession(userData.id);
+      if (!sessionToken) {
+        throw new Error('Failed to create session');
+      }
+
+      // Log action
+      await createAuditLog(userData.id, 'OTP_VERIFIED', 'AUTH');
+
+      // Return user without sensitive data
+      const { password_hash, two_factor_secret, ...safeUser } = userData;
+
+      return { user: safeUser, token };
+    } catch (error: any) {
+      console.error('Verify OTP error:', error);
+      throw error;
+    }
+  },
+};

@@ -1,39 +1,51 @@
 import { NextRequest } from 'next/server';
-import { fail, ok } from '@/lib/backend/response';
-import { loginSchema } from '@/lib/backend/validation';
-import { login } from '@/lib/backend/auth-service';
-import { enforceRateLimit } from '@/lib/backend/rate-limit';
-import { writeAuditLog, writeActivityLog } from '@/lib/backend/audit';
+import { errorResponse, successResponse } from '@/lib/backend/response';
+import { loginSchema, validateBody } from '@/lib/backend/validation';
+import { login } from '@/lib/backend/auth-service-new';
+import { rateLimitPresets } from '@/lib/backend/rate-limit';
+import { getIpAddress } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || 'unknown';
-    const userAgent = request.headers.get('user-agent') || 'unknown';
+    const ip = getIpAddress(request);
+    const userAgent = request.headers.get('user-agent') || '';
 
-    enforceRateLimit(`login:${ip}`, 15, 60_000);
+    // Rate limiting: 10 login attempts per 15 minutes per IP
+    if (!rateLimitPresets.authRateLimit(ip)) {
+      return errorResponse(
+        new Error('Too many login attempts. Please try again later.'),
+        'Rate limited'
+      );
+    }
 
-    const body = await request.json();
-    const parsed = loginSchema.parse(body);
+    // Validate input
+    const body = await validateBody(loginSchema, request);
 
-    const result = await login(parsed.email, parsed.password, ip, userAgent);
+    // Authenticate user
+    const result = await login({
+      email: body.email,
+      password: body.password,
+      ipAddress: ip,
+      userAgent,
+    });
 
-    await Promise.all([
-      writeAuditLog({
-        userId: result.user.id,
-        action: 'AUTH_LOGIN',
-        entityType: 'session',
-        entityId: result.session.id,
-        ipAddress: ip,
-      }),
-      writeActivityLog({
-        userId: result.user.id,
-        action: 'User logged in',
-        category: 'auth',
-      }),
-    ]);
-
-    return ok(result, 'Login successful', 200);
+    return successResponse(
+      {
+        token: result.token,
+        sessionId: result.sessionId,
+        user: {
+          id: result.userId,
+          email: result.email,
+          fullName: result.fullName,
+        },
+      },
+      'Login successful',
+      200
+    );
   } catch (error) {
-    return fail(error);
+    return errorResponse(
+      error instanceof Error ? error : new Error('Login failed'),
+      'Login failed'
+    );
   }
 }

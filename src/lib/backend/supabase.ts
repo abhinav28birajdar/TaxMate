@@ -1,49 +1,70 @@
-import { createClient } from '@supabase/supabase-js';
-import { NextRequest } from 'next/server';
-import { getEnv } from './env';
-import { HttpError } from './errors';
-import { verifyAccessToken } from './jwt';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { env } from './env';
+import { unauthorized } from './errors';
+import { verifyAccessToken, JWTPayload, extractBearerToken } from './jwt';
 
-const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL');
-const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
+let serviceClient: SupabaseClient | null = null;
 
-export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
-
-export function getBearerToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new HttpError('Missing authorization header', 401, 'UNAUTHORIZED');
+export function createServiceClient(): SupabaseClient {
+  if (serviceClient) {
+    return serviceClient;
   }
-  return authHeader.slice(7);
+
+  serviceClient = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  return serviceClient;
 }
 
-export async function requireAuth(request: NextRequest) {
-  const token = getBearerToken(request);
-  const payload = await verifyAccessToken(token);
+export function getServiceClient(): SupabaseClient {
+  return createServiceClient();
+}
 
-  const { data: session, error } = await supabaseAdmin
-    .from('sessions')
-    .select('id, user_id, is_active, expires_at')
-    .eq('id', payload.sessionId)
-    .single();
+export async function authGuard(request: Request): Promise<JWTPayload> {
+  const authHeader = request.headers.get('authorization');
+  const token = extractBearerToken(authHeader);
 
-  if (error || !session || !session.is_active) {
-    throw new HttpError('Session is invalid', 401, 'SESSION_INVALID');
+  if (!token) {
+    throw unauthorized('Missing or invalid authorization header');
   }
 
-  if (new Date(session.expires_at).getTime() < Date.now()) {
-    throw new HttpError('Session has expired', 401, 'SESSION_EXPIRED');
-  }
+  try {
+    const payload = await verifyAccessToken(token);
 
-  return {
-    userId: payload.sub,
-    role: payload.role,
-    email: payload.email,
-    sessionId: payload.sessionId,
-  };
+    // Verify session is still active
+    const client = getServiceClient();
+    const { data: session, error } = await client
+      .from('sessions')
+      .select('id, is_active, expires_at')
+      .eq('id', payload.sessionId)
+      .eq('user_id', payload.userId)
+      .single();
+
+    if (error || !session) {
+      throw unauthorized('Session not found');
+    }
+
+    if (!session.is_active) {
+      throw unauthorized('Session is inactive');
+    }
+
+    if (new Date(session.expires_at).getTime() < Date.now()) {
+      throw unauthorized('Session has expired');
+    }
+
+    return payload;
+  } catch (error) {
+    if (error instanceof Error && 'statusCode' in error) {
+      throw error;
+    }
+    throw unauthorized('Authentication failed');
+  }
+}
+
+export async function getUserFromRequest(request: Request): Promise<JWTPayload> {
+  return authGuard(request);
 }

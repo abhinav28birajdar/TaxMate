@@ -201,7 +201,7 @@ export default function WorkflowAutomationPage() {
               <div className="flex items-start justify-between mb-3">
                 <p className="font-semibold text-slate-900">{integration.name}</p>
                 <Badge
-                  variant={integration.status === 'connected' ? 'success' : 'default'}
+                  variant={integration.status === 'connected' ? 'success' : 'info'}
                 >
                   {integration.status === 'connected' ? '✓ Connected' : '⏳ Pending'}
                 </Badge>

@@ -356,7 +356,7 @@ export interface PerformanceMetrics {
   taskCompletionRate: number;
   invoiceCollectionRate: number;
   averageResponseTime: number;
-  customers atisfactionScore: number;
+  customerSatisfactionScore: number;
   totalRevenueGenerated: number;
 }
 

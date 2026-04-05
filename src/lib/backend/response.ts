@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { HttpError } from './errors';
+import { AppError, isAppError } from './errors';
 
 export interface ApiEnvelope<T = unknown> {
   success: boolean;
@@ -7,23 +7,29 @@ export interface ApiEnvelope<T = unknown> {
   data?: T;
   error?: {
     code: string;
-    details?: Record<string, unknown>;
+    details?: unknown;
   };
 }
 
-export function ok<T>(data: T, message = 'OK', status = 200) {
-  const payload: ApiEnvelope<T> = {
+export function successResponse<T>(
+  data: T,
+  message: string = 'Success',
+  status: number = 200
+): NextResponse<ApiEnvelope<T>> {
+  const envelope: ApiEnvelope<T> = {
     success: true,
     message,
     data,
   };
-
-  return NextResponse.json(payload, { status });
+  return NextResponse.json(envelope, { status });
 }
 
-export function fail(error: unknown) {
-  if (error instanceof HttpError) {
-    const payload: ApiEnvelope = {
+export function errorResponse(
+  error: AppError | Error | unknown,
+  defaultMessage: string = 'An error occurred'
+): NextResponse<ApiEnvelope> {
+  if (isAppError(error)) {
+    const envelope: ApiEnvelope = {
       success: false,
       message: error.message,
       error: {
@@ -31,16 +37,31 @@ export function fail(error: unknown) {
         details: error.details,
       },
     };
-    return NextResponse.json(payload, { status: error.statusCode });
+    return NextResponse.json(envelope, { status: error.statusCode });
   }
 
-  console.error('Unhandled API error', error);
-  const payload: ApiEnvelope = {
+  if (error instanceof Error) {
+    console.error('Unhandled error:', error.message, error.stack);
+    const envelope: ApiEnvelope = {
+      success: false,
+      message: defaultMessage,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+      },
+    };
+    return NextResponse.json(envelope, { status: 500 });
+  }
+
+  console.error('Unknown error:', error);
+  const envelope: ApiEnvelope = {
     success: false,
-    message: 'Internal server error',
+    message: defaultMessage,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
     },
   };
-  return NextResponse.json(payload, { status: 500 });
+  return NextResponse.json(envelope, { status: 500 });
 }
+
+export const ok = successResponse;
+export const fail = errorResponse;

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { themeConfig, colors, shadows, borderRadius } from '@/src/theme/design-system';
+import { themeConfig, colors, shadows, borderRadius } from '@/theme/design-system';
 
 // ============================================================================
 // TAXMATE: Core UI Component Library
@@ -151,13 +151,13 @@ Input.displayName = 'Input';
 // BADGE COMPONENT
 // ============================================================================
 
-interface BadgeProps {
+interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: 'primary' | 'success' | 'danger' | 'warning' | 'info' | 'neutral';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
 }
 
-export const Badge: React.FC<BadgeProps> = ({ variant = 'primary', size = 'md', children }) => {
+export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(({ variant = 'primary', size = 'md', children, className = '', ...props }, ref) => {
   const colorMap = {
     primary: { bg: '#e0f2fe', text: colors.primary[600] },
     success: { bg: '#dcfce7', text: colors.success[600] },
@@ -175,16 +175,21 @@ export const Badge: React.FC<BadgeProps> = ({ variant = 'primary', size = 'md', 
 
   return (
     <span
-      className={`inline-flex items-center rounded-full font-medium ${sizeClasses[size]}`}
+      ref={ref}
+      className={`inline-flex items-center rounded-full font-medium ${sizeClasses[size]} ${className}`}
       style={{
         backgroundColor: colorMap[variant].bg,
         color: colorMap[variant].text,
+        ...props.style,
       }}
+      {...props}
     >
       {children}
     </span>
   );
-};
+});
+
+Badge.displayName = 'Badge';
 
 // ============================================================================
 // LOADING SPINNER
