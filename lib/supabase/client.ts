@@ -1,20 +1,81 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * Supabase Browser Client
+ * 
+ * This client is used for browser-side operations.
+ * It includes authentication persistence and automatic token refresh.
+ */
+
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import { type Database } from '../types/database.types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// For development, provide fallback values if env vars are missing
-const url = supabaseUrl || 'https://example-placeholder.supabase.co';
-const anonKey = supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder';
+// Singleton instance
+let browserClient: SupabaseClient<Database> | null = null;
 
-// Only log warnings instead of throwing errors during development
-if (!supabaseUrl) {
-  console.warn('Missing environment variable NEXT_PUBLIC_SUPABASE_URL. Using placeholder value for development.');
+// Validate environment variables at startup
+if (typeof window !== 'undefined') {
+  if (!supabaseUrl || supabaseUrl === '') {
+    console.error(
+      '⚠️ NEXT_PUBLIC_SUPABASE_URL is missing!\n' +
+      'Please add your Supabase project URL to .env.local file.'
+    );
+  }
+
+  if (!supabaseAnonKey || supabaseAnonKey === '') {
+    console.error(
+      '⚠️ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing!\n' +
+      'Please add your Supabase anon key to .env.local file.'
+    );
+  }
 }
 
-if (!supabaseAnonKey) {
-  console.warn('Missing environment variable NEXT_PUBLIC_SUPABASE_ANON_KEY. Using placeholder value for development.');
+/**
+ * Creates or returns the singleton Supabase browser client
+ */
+export function createClient(): SupabaseClient<Database> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Supabase credentials are not configured. ' +
+      'Please check your .env.local file and ensure:\n' +
+      '- NEXT_PUBLIC_SUPABASE_URL is set\n' +
+      '- NEXT_PUBLIC_SUPABASE_ANON_KEY is set'
+    );
+  }
+
+  if (!browserClient) {
+    browserClient = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce',
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+      global: {
+        headers: {
+          'x-client-info': 'taxmate-web',
+        },
+      },
+    });
+  }
+
+  return browserClient;
 }
 
-export const supabase = createClient<Database>(url, anonKey);
+// Legacy exports for backwards compatibility
+export const supabase = typeof window !== 'undefined' && supabaseUrl && supabaseAnonKey 
+  ? createClient()
+  : null;
+
+export function getClient(): SupabaseClient<Database> {
+  return createClient();
+}
+
+export { type Database };

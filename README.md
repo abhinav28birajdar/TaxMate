@@ -1,99 +1,250 @@
-# TaxMate - Financial Services Marketplace
+# TaxMate
 
-TaxMate is an enterprise-grade financial services marketplace that connects individuals and businesses with chartered accountants for professional financial services, tax planning, and compliance solutions.
+Production-grade SaaS backend architecture for identity, RBAC, onboarding, notifications, analytics, support operations, and secure file metadata handling.
+
+## Project Overview
+
+This revision introduces a unified backend architecture under src/app/api/v1 and src/lib/backend, with a single authoritative SQL schema at supabase/production_schema.sql.
+
+The system now provides:
+
+- Hardened authentication with account lockout and session tracking
+- Role-based access control through roles, permissions, and user-role mappings
+- Enhanced profile, onboarding, settings, notification, support, and audit capabilities
+- Standardized API response envelopes and centralized error handling
+- Database-level protections through constraints, indexes, triggers, and RLS
 
 ## Features
 
-- **User Roles**: Customers, Chartered Accountants (CAs), and Businesses
-- **Service Listings**: CAs can create service listings with pricing details
-- **Booking System**: Schedule consultations and services
-- **Payment Integration**: Secure payment processing with Stripe
-- **Review System**: Rating and review system for services
-- **Authentication**: Secure user authentication with Supabase Auth
-- **Profile Management**: Customizable profiles for all user types
+### Core
+
+- Signup, login, logout, forgot password, reset password, change password
+- JWT access token + multi-device session tracking
+- Account lock after repeated failed login attempts
+- Role management and permission mappings
+- Profile management with social links and public/private toggle
+- Smart multi-step onboarding
+- Notification history with read/unread state
+- User activity and audit logging
+- File upload metadata and signed URL access pattern
+- Support ticket lifecycle for users and admins
+- User settings for theme, preferences, and notification settings
+- Feature flags for controlled rollouts
+
+### Security and Reliability
+
+- Strict response envelope with no raw server error exposure
+- Input validation with Zod
+- Basic per-IP rate limiting for auth-sensitive endpoints
+- RLS policies across user-owned and admin-managed data
+- Audit trigger support for sensitive table changes
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15, React 19, TailwindCSS 4
-- **Backend**: Supabase (PostgreSQL database + Auth)
-- **Payment Processing**: Stripe
-- **Authentication**: Supabase Auth
-- **Styling**: TailwindCSS with custom UI components
-- **Form Handling**: React Hook Form with Zod validation
-- **Hosting**: Vercel
+- Next.js App Router API routes
+- TypeScript
+- Supabase Postgres + RLS + Realtime + Storage
+- jose for JWT signing/verification
+- bcryptjs for password hashing
+- Zod for runtime request validation
 
-## Getting Started
+## Architecture Overview
 
-### Prerequisites
+### Backend layers
 
-- Node.js 18+ (recommended: 20)
-- npm or yarn
-- Supabase account
-- Stripe account (for payment processing)
+- API Layer: src/app/api/v1/*
+- Application Core: src/lib/backend/*
+- Database: supabase/production_schema.sql
 
-### Environment Setup
+### Core backend modules
 
-Create a `.env.local` file in the root directory with the following variables:
+- src/lib/backend/response.ts: standardized success/error responses
+- src/lib/backend/errors.ts: typed HTTP error model
+- src/lib/backend/env.ts: backend env validation
+- src/lib/backend/rate-limit.ts: in-memory rate limiter
+- src/lib/backend/jwt.ts: access token signing and verification
+- src/lib/backend/supabase.ts: service-role data client and auth guard
+- src/lib/backend/auth-service.ts: signup/login/session/password workflows
+- src/lib/backend/rbac.ts: role checks
+- src/lib/backend/audit.ts: activity and audit writes
+- src/lib/backend/validation.ts: request schemas
 
-```
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
-STRIPE_SECRET_KEY=your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-```
+## Database Design Summary
 
-### Installation
+Single schema file: supabase/production_schema.sql
 
-```bash
-# Install dependencies
+### Core tables
+
+- users
+- profiles
+- roles
+- permissions
+- user_roles
+- sessions
+- activity_logs
+- notifications
+- onboarding_data
+
+### Advanced tables
+
+- audit_logs
+- user_settings
+- file_uploads
+- support_tickets
+- system_logs
+- feature_flags
+
+### Database guarantees
+
+- Primary keys and foreign keys on all related entities
+- Unique constraints for identity and lookup keys
+- Performance indexes for auth, feed, and support workloads
+- Updated-at triggers
+- RBAC helper functions
+- Sensitive-change audit triggers
+- Row-level security policies
+- Soft-delete fields for lifecycle-safe deletion
+
+## Setup Instructions
+
+1. Install dependencies
+
 npm install
 
-# Run the development server
+2. Prepare environment
+
+Copy .env.example to .env.local and fill all required variables.
+
+3. Apply database schema
+
+Execute supabase/production_schema.sql in your Supabase SQL editor.
+
+4. Create storage bucket
+
+Create uploads bucket in Supabase Storage.
+
+5. Start the app
+
 npm run dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+## Environment Variables
 
-### Database Setup
+Required backend runtime variables:
 
-1. Create a new Supabase project
-2. Run the SQL scripts in `lib/supabase/schema.sql` to create the database schema
-3. Run the SQL scripts in `lib/supabase/policies.sql` to set up Row Level Security policies
+- NEXT_PUBLIC_SUPABASE_URL
+- NEXT_PUBLIC_SUPABASE_ANON_KEY
+- SUPABASE_SERVICE_ROLE_KEY
+- JWT_SECRET
+- BCRYPT_SALT_ROUNDS
+- NEXT_PUBLIC_APP_URL
 
-## Project Structure
+Recommended additional variables:
 
-```
-├── app/                # Next.js app directory (App Router)
-│   ├── api/            # API routes
-│   ├── (auth)/         # Authentication pages
-│   ├── (dashboard)/    # Dashboard pages
-│   ├── services/       # Service listing pages
-│   └── globals.css     # Global styles
-├── components/         # React components
-│   ├── ui/             # UI components
-│   ├── auth/           # Authentication components
-│   ├── dashboard/      # Dashboard components
-│   └── services/       # Service-related components
-├── context/            # React context providers
-├── lib/                # Utility functions and configurations
-│   ├── supabase/       # Supabase clients and helpers
-│   └── utils.ts        # General utility functions
-├── public/             # Static assets
-└── next.config.ts      # Next.js configuration
-```
+- RESEND_API_KEY
+- NEXTAUTH_SECRET
+- SENTRY_DSN
+- REDIS_URL
 
-## Deployment
+## API Endpoints
 
-The application can be deployed on Vercel with the following steps:
+### Auth
 
-1. Push your code to a GitHub repository
-2. Connect the repository to Vercel
-3. Set the environment variables in the Vercel project settings
-4. Deploy the application
+- POST /api/v1/auth/signup
+- POST /api/v1/auth/login
+- POST /api/v1/auth/logout
+- POST /api/v1/auth/forgot-password
+- POST /api/v1/auth/reset-password
+- POST /api/v1/auth/change-password
+- GET /api/v1/auth/sessions
+- DELETE /api/v1/auth/sessions
 
-## License
+### User domain
 
-This project is proprietary and not open for redistribution or public use without explicit permission.
+- GET /api/v1/profile
+- PATCH /api/v1/profile
+- GET /api/v1/onboarding
+- PUT /api/v1/onboarding
+- GET /api/v1/notifications
+- POST /api/v1/notifications
+- PATCH /api/v1/notifications
+- GET /api/v1/settings
+- PUT /api/v1/settings
+- POST /api/v1/files/upload
+- GET /api/v1/support-tickets
+- POST /api/v1/support-tickets
+- PATCH /api/v1/support-tickets
+
+### Admin and analytics
+
+- GET /api/v1/admin/users
+- PATCH /api/v1/admin/users
+- GET /api/v1/admin/feature-flags
+- POST /api/v1/admin/feature-flags
+- GET /api/v1/activity
+
+### Response format
+
+All v1 APIs return:
+
+{
+   "success": true,
+   "message": "...",
+   "data": {}
+}
+
+or
+
+{
+   "success": false,
+   "message": "...",
+   "error": {
+      "code": "...",
+      "details": {}
+   }
+}
+
+## Folder Structure
+
+- src/app/api/v1/auth: authentication and session management
+- src/app/api/v1/profile: profile read/update
+- src/app/api/v1/onboarding: onboarding state management
+- src/app/api/v1/notifications: notification feed and mutation
+- src/app/api/v1/settings: user preferences and settings
+- src/app/api/v1/files/upload: secure file uploads metadata flow
+- src/app/api/v1/support-tickets: support workflow
+- src/app/api/v1/admin: admin-only management endpoints
+- src/app/api/v1/activity: admin analytics reads
+- src/lib/backend: shared backend platform code
+- supabase/production_schema.sql: only active DB schema source
+- supabase/archive: archived legacy SQL assets
+
+## Security Practices
+
+- Passwords stored as bcrypt hashes
+- JWT with short-lived access token
+- Session revocation and multi-device tracking
+- Account lockout after repeated failures
+- Strict authorization checks on privileged APIs
+- RLS policies at database layer
+- Audit trail for sensitive operations
+- Structured error responses without raw stack traces
+
+## Testing and Reliability Checklist
+
+- Validate signup/login/logout flows
+- Verify session listing and revocation
+- Confirm password reset and change-password paths
+- Test profile and onboarding updates
+- Validate notification read/unread transitions
+- Test support ticket create/respond workflows
+- Verify admin role restrictions
+- Verify SQL schema executes cleanly in a fresh database
+
+## Future Enhancements
+
+- Refresh-token rotation and token binding
+- Dedicated email service integration for verification/reset
+- Redis-backed distributed rate limiting
+- Queue-backed asynchronous audit and notification fanout
+- OpenAPI spec generation for endpoint contracts
+- Integration tests for all v1 endpoints

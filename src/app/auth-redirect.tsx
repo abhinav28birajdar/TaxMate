@@ -1,0 +1,30 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthHook';
+
+export default function PageRedirect() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        // If user is already logged in, redirect to dashboard
+        router.push('/dashboard');
+      } else {
+        // If no user, redirect to login
+        router.push('/login');
+      }
+    }
+  }, [user, loading, router]);
+
+  // Show loading while redirecting
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <p className="ml-3 text-lg">Redirecting...</p>
+    </div>
+  );
+}

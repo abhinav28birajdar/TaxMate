@@ -1,0 +1,1069 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  emailVerified        Boolean   @default(false)
+  emailVerifiedAt      DateTime?
+  passwordHash         String?
+  name                 String
+  phone                String?
+  phoneVerified        Boolean   @default(false)
+  avatarUrl            String?
+  role                 UserRole  @default(CLIENT)
+  status               UserStatus @default(PENDING_VERIFICATION)
+  twoFactorEnabled     Boolean   @default(false)
+  twoFactorSecret      String?
+  locale               String    @default("en")
+  timezone             String    @default("Asia/Kolkata")
+  lastLoginAt          DateTime?
+  lastActiveAt         DateTime?
+  loginCount           Int       @default(0)
+  onboardingCompleted  Boolean   @default(false)
+  onboardingStep       Int       @default(0)
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  caProfile            CAProfile?
+  clientProfile        ClientProfile?
+  subscription         Subscription?
+  sessions             UserSession[]
+  oauthAccounts        OAuthAccount[]
+  notifications        Notification[]
+  notificationPrefs    NotificationPreference?
+  tasksCreated         Task[]    @relation("TaskCreator")
+  tasksAssigned        Task[]    @relation("TaskAssignee")
+  caTasksOwned         Task[]    @relation("TaskCA")
+  clientTasks          Task[]    @relation("TaskClient")
+  conversationsAsCA    Conversation[] @relation("ConversationCA")
+  conversationsAsClient Conversation[] @relation("ConversationClient")
+  sentMessages         Message[]
+  invoicesAsCA         Invoice[] @relation("InvoiceCA")
+  invoicesAsClient     Invoice[] @relation("InvoiceClient")
+  paymentsAsCA         Payment[] @relation("PaymentCA")
+  paymentsAsClient     Payment[] @relation("PaymentClient")
+  documentsUploaded    Document[]
+  caDocuments          Document[] @relation("DocumentCA")
+  clientDocuments      Document[] @relation("DocumentClient")
+  taxFilingsAsCA       TaxFiling[] @relation("FilingCA")
+  taxFilingsAsClient   TaxFiling[] @relation("FilingClient")
+  expenses             Expense[]
+  appointmentsAsCA     Appointment[] @relation("AppointmentCA")
+  appointmentsAsClient Appointment[] @relation("AppointmentClient")
+  videoCallRooms       VideoCallRoom[]
+  reviews              Review[] @relation("ReviewCA")
+  clientReviews        Review[] @relation("ReviewClient")
+  notes                Note[]
+  teamMemberships      TeamMember[] @relation("TeamCA")
+  teamStaff            TeamMember[] @relation("TeamMember")
+  timeEntries          TimeEntry[]
+  auditLogs            AuditLog[]
+  supportTickets       SupportTicket[]
+  blogPosts            BlogPost[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  CA
+  CLIENT
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+  ON_HOLD
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentGateway {
+  RAZORPAY
+  STRIPE
+  BANK_TRANSFER
+  UPI
+  CASH
+  CHEQUE
+}
+
+enum FilingType {
+  ITR_1
+  ITR_2
+  ITR_3
+  ITR_4
+  GSTR_1
+  GSTR_3B
+  GSTR_9
+  TDS_24Q
+  TDS_26Q
+  ADVANCE_TAX
+  OTHER
+}
+
+enum FilingStatus {
+  NOT_STARTED
+  DOCUMENT_COLLECTION
+  IN_PROGRESS
+  UNDER_REVIEW
+  SUBMITTED
+  ACKNOWLEDGED
+  COMPLETED
+  CANCELLED
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum AppointmentType {
+  VIDEO_CALL
+  IN_PERSON
+  PHONE_CALL
+}
+
+enum SubscriptionPlanType {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+  TRIALING
+}
+
+enum ExpenseCategory {
+  OFFICE_SUPPLIES
+  TRAVEL
+  MEALS
+  SOFTWARE
+  HARDWARE
+  MARKETING
+  LEGAL
+  UTILITIES
+  RENT
+  SALARIES
+  PROFESSIONAL_FEES
+  TAXES
+  INSURANCE
+  OTHER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  AUDIO
+  SYSTEM
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_OVERDUE
+  INVOICE_SENT
+  INVOICE_PAID
+  INVOICE_OVERDUE
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  DOCUMENT_SHARED
+  APPOINTMENT_BOOKED
+  APPOINTMENT_REMINDER
+  MESSAGE_RECEIVED
+  FILING_DEADLINE
+  CA_APPROVED
+  SYSTEM_ANNOUNCEMENT
+  OTHER
+}
+
+model CAProfile {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  icaiMembershipNumber  String?   @unique
+  firmName              String?
+  designation           String    @default("Chartered Accountant")
+  bio                   String?
+  yearsOfExperience     Int       @default(0)
+  specializations       String[]
+  languages             String[]  @default(["English"])
+  status                CAStatus  @default(PENDING)
+  rejectionReason       String?
+  approvedAt            DateTime?
+  approvedBy            String?
+  officeAddress         String?
+  city                  String?
+  state                 String?
+  pincode               String?
+  country               String    @default("India")
+  websiteUrl            String?
+  linkedinUrl           String?
+  gstin                 String?
+  panNumber             String?
+  bankAccountNumber     String?
+  bankIfsc              String?
+  bankAccountName       String?
+  bankName              String?
+  consultationFee       Decimal?  @db.Decimal(10,2)
+  acceptsOnlinePayment  Boolean   @default(true)
+  publicProfile         Boolean   @default(true)
+  slug                  String?   @unique
+  totalClients          Int       @default(0)
+  averageRating         Decimal   @default(0) @db.Decimal(3,2)
+  reviewCount           Int       @default(0)
+  signatureUrl          String?
+  letterheadUrl         String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availability          CAAvailability[]
+  availabilityOverrides CAAvailabilityOverride[]
+
+  @@map("ca_profiles")
+}
+
+enum CAStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model ClientProfile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  caId            String?
+  panNumber       String?
+  aadhaarNumber   String?
+  dateOfBirth     DateTime?
+  businessName    String?
+  businessType    String?
+  gstin           String?
+  industry        String?
+  annualTurnover  Decimal?  @db.Decimal(15,2)
+  city            String?
+  state           String?
+  pincode         String?
+  bankAccountNumber String?
+  bankIfsc        String?
+  bankName        String?
+  clientCode      String?
+  tags            String[]  @default([])
+  notes           String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("client_profiles")
+}
+
+model Task {
+  id              String       @id @default(uuid())
+  caId            String
+  clientId        String?
+  assignedToId    String?
+  createdById     String
+  parentTaskId    String?
+  title           String
+  description     String?
+  status          TaskStatus   @default(TODO)
+  priority        TaskPriority @default(MEDIUM)
+  dueDate         DateTime?
+  startDate       DateTime?
+  completedAt     DateTime?
+  estimatedHours  Decimal?     @db.Decimal(6,2)
+  actualHours     Decimal      @default(0) @db.Decimal(6,2)
+  tags            String[]     @default([])
+  position        Int          @default(0)
+  isBillable      Boolean      @default(false)
+  billingRate     Decimal?     @db.Decimal(10,2)
+  billed          Boolean      @default(false)
+  invoiceId       String?
+  metadata        Json         @default("{}")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  ca              User         @relation("TaskCA", fields: [caId], references: [id])
+  client          User?        @relation("TaskClient", fields: [clientId], references: [id])
+  assignedTo      User?        @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdBy       User         @relation("TaskCreator", fields: [createdById], references: [id])
+  parentTask      Task?        @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  subtasks        Task[]       @relation("TaskSubtasks")
+  comments        TaskComment[]
+  attachments     TaskAttachment[]
+  timeLogs        TaskTimeLog[]
+
+  @@map("tasks")
+}
+
+model Invoice {
+  id               String         @id @default(uuid())
+  invoiceNumber    String?        @unique
+  caId             String
+  clientId         String
+  status           InvoiceStatus  @default(DRAFT)
+  subtotal         Decimal        @db.Decimal(12,2)
+  discountType     String?
+  discountValue    Decimal        @default(0) @db.Decimal(10,2)
+  discountAmount   Decimal        @default(0) @db.Decimal(12,2)
+  cgstRate         Decimal        @default(0) @db.Decimal(5,2)
+  sgstRate         Decimal        @default(0) @db.Decimal(5,2)
+  igstRate         Decimal        @default(0) @db.Decimal(5,2)
+  cgstAmount       Decimal        @default(0) @db.Decimal(12,2)
+  sgstAmount       Decimal        @default(0) @db.Decimal(12,2)
+  igstAmount       Decimal        @default(0) @db.Decimal(12,2)
+  totalAmount      Decimal        @db.Decimal(12,2)
+  paidAmount       Decimal        @default(0) @db.Decimal(12,2)
+  dueAmount        Decimal        @db.Decimal(12,2)
+  currency         String         @default("INR")
+  invoiceDate      DateTime       @db.Date
+  dueDate          DateTime?      @db.Date
+  paidAt           DateTime?
+  sentAt           DateTime?
+  viewedAt         DateTime?
+  title            String?
+  notes            String?
+  termsConditions  String?
+  fromName         String?
+  fromAddress      String?
+  fromGstin        String?
+  fromPan          String?
+  fromEmail        String?
+  fromPhone        String?
+  fromBankAccountNumber String?
+  fromBankIfsc     String?
+  fromBankName     String?
+  fromBankAccountName String?
+  toName           String?
+  toAddress        String?
+  toGstin          String?
+  toPan            String?
+  toEmail          String?
+  isRecurring      Boolean        @default(false)
+  recurringFrequency String?
+  recurringEndDate DateTime?      @db.Date
+  recurringParentId String?
+  nextInvoiceDate  DateTime?      @db.Date
+  templateId       String         @default("default")
+  templateColor    String         @default("#2563EB")
+  logoUrl          String?
+  paymentLink      String?
+  metadata         Json           @default("{}")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  ca               User           @relation("InvoiceCA", fields: [caId], references: [id])
+  client           User           @relation("InvoiceClient", fields: [clientId], references: [id])
+  lineItems        InvoiceLineItem[]
+  payments         Payment[]
+  recurringParent  Invoice?       @relation("RecurringInvoices", fields: [recurringParentId], references: [id])
+  recurringChildren Invoice[]     @relation("RecurringInvoices")
+  taxFilings       TaxFiling[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id               String         @id @default(uuid())
+  paymentReference String         @unique
+  invoiceId        String?
+  caId             String
+  clientId         String
+  amount           Decimal        @db.Decimal(12,2)
+  currency         String         @default("INR")
+  status           PaymentStatus  @default(PENDING)
+  gateway          PaymentGateway
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  gatewaySignature String?
+  platformFee      Decimal?       @db.Decimal(10,2)
+  netAmount        Decimal?       @db.Decimal(12,2)
+  settled          Boolean        @default(false)
+  settledAt        DateTime?
+  refundedAmount   Decimal        @default(0) @db.Decimal(12,2)
+  refundReason     String?
+  failureReason    String?
+  paidAt           DateTime?
+  metadata         Json           @default("{}")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  invoice          Invoice?       @relation(fields: [invoiceId], references: [id])
+  ca               User           @relation("PaymentCA", fields: [caId], references: [id])
+  client           User           @relation("PaymentClient", fields: [clientId], references: [id])
+
+  @@map("payments")
+}
+
+model Document {
+  id                   String    @id @default(uuid())
+  caId                 String
+  clientId             String?
+  uploadedById         String
+  folderId             String?
+  name                 String
+  originalName         String
+  type                 String    @default("OTHER")
+  description          String?
+  tags                 String[]  @default([])
+  fileUrl              String
+  fileKey              String
+  mimeType             String?
+  fileSize             Int?
+  thumbnailUrl         String?
+  isSharedWithClient   Boolean   @default(false)
+  sharedAt             DateTime?
+  isStarred            Boolean   @default(false)
+  isDeleted            Boolean   @default(false)
+  deletedAt            DateTime?
+  version              Int       @default(1)
+  financialYear        String?
+  requiresSignature    Boolean   @default(false)
+  signatureStatus      String?
+  signedAt             DateTime?
+  signedDocumentUrl    String?
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  ca                   User      @relation("DocumentCA", fields: [caId], references: [id])
+  client               User?     @relation("DocumentClient", fields: [clientId], references: [id])
+  uploadedBy           User      @relation(fields: [uploadedById], references: [id])
+  folder               DocumentFolder? @relation(fields: [folderId], references: [id])
+
+  @@map("documents")
+}
+
+model TaxFiling {
+  id                   String        @id @default(uuid())
+  caId                 String
+  clientId             String
+  assignedToId         String?
+  type                 FilingType
+  financialYear        String
+  assessmentYear       String?
+  period               String?
+  status               FilingStatus  @default(NOT_STARTED)
+  dueDate              DateTime?     @db.Date
+  filedDate            DateTime?     @db.Date
+  ackNumber            String?
+  grossIncome          Decimal?      @db.Decimal(15,2)
+  taxableIncome        Decimal?      @db.Decimal(15,2)
+  taxPayable           Decimal?      @db.Decimal(15,2)
+  taxPaid              Decimal?      @db.Decimal(15,2)
+  refundAmount         Decimal?      @db.Decimal(15,2)
+  interestPenalty      Decimal       @default(0) @db.Decimal(15,2)
+  checklist            Json          @default("[]")
+  completionPercentage Int           @default(0)
+  filingUrl            String?
+  acknowledgmentUrl    String?
+  notes                String?
+  feeCharged           Decimal?      @db.Decimal(10,2)
+  invoiceId            String?
+  metadata             Json          @default("{}")
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  ca                   User          @relation("FilingCA", fields: [caId], references: [id])
+  client               User          @relation("FilingClient", fields: [clientId], references: [id])
+  invoice              Invoice?      @relation(fields: [invoiceId], references: [id])
+
+  @@map("tax_filings")
+}
+
+model Appointment {
+  id                String            @id @default(uuid())
+  caId              String
+  clientId          String
+  title             String?
+  description       String?
+  type              AppointmentType   @default(VIDEO_CALL)
+  status            AppointmentStatus @default(PENDING)
+  scheduledAt       DateTime
+  durationMinutes   Int               @default(60)
+  endsAt            DateTime?
+  meetingLink       String?
+  videoRoomId       String?
+  reminderSent24h   Boolean           @default(false)
+  reminderSent1h    Boolean           @default(false)
+  cancelledAt       DateTime?
+  cancellationReason String?
+  summary           String?
+  actionItems       String[]
+  fee               Decimal?          @db.Decimal(10,2)
+  invoiceId         String?
+  metadata          Json              @default("{}")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  ca                User              @relation("AppointmentCA", fields: [caId], references: [id])
+  client                User              @relation("AppointmentClient", fields: [clientId], references: [id])
+
+  @@map("appointments")
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  body        String?
+  link        String?
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  sourceType  String?
+  sourceId    String?
+  priority    String           @default("normal")
+  expiresAt   DateTime?
+  metadata    Json             @default("{}")
+  createdAt   DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Subscription {
+  id                    String             @id @default(uuid())
+  caId                  String             @unique
+  plan                  SubscriptionPlanType @default(FREE)
+  status                SubscriptionStatus @default(ACTIVE)
+  billingCycle          String             @default("monthly")
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  trialEnd              DateTime?
+  gateway               String?
+  gatewaySubscriptionId String?
+  cancelledAt           DateTime?
+  cancelAtPeriodEnd     Boolean            @default(false)
+  cancellationReason    String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  ca                    User               @relation(fields: [caId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Conversation {
+  id                   String    @id @default(uuid())
+  caId                 String
+  clientId             String
+  isArchivedByCa       Boolean   @default(false)
+  isArchivedByClient   Boolean   @default(false)
+  lastMessageAt        DateTime?
+  lastMessagePreview   String?
+  caUnreadCount        Int       @default(0)
+  clientUnreadCount    Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  ca                   User      @relation("ConversationCA", fields: [caId], references: [id])
+  client               User      @relation("ConversationClient", fields: [clientId], references: [id])
+  messages             Message[]
+
+  @@unique([caId, clientId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  type           MessageType  @default(TEXT)
+  content        String?
+  fileUrl        String?
+  fileName       String?
+  fileSize       Int?
+  mimeType       String?
+  replyToId      String?
+  isEdited       Boolean      @default(false)
+  editedAt       DateTime?
+  isDeleted      Boolean      @default(false)
+  deletedAt      DateTime?
+  readBy         Json         @default("[]")
+  reactions      Json         @default("[]")
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+  replyTo        Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        Message[]    @relation("MessageReplies")
+
+  @@map("messages")
+}
+
+model CAAvailability {
+  id                  String    @id @default(uuid())
+  caId                String
+  dayOfWeek           Int
+  startTime           String
+  endTime             String
+  slotDurationMinutes Int       @default(60)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  caProfile           CAProfile @relation(fields: [caId], references: [userId], onDelete: Cascade)
+
+  @@unique([caId, dayOfWeek, startTime])
+  @@map("ca_availability")
+}
+
+model CAAvailabilityOverride {
+  id            String    @id @default(uuid())
+  caId          String
+  date          DateTime  @db.Date
+  isUnavailable Boolean   @default(false)
+  startTime     String?
+  endTime       String?
+  reason        String?
+  createdAt     DateTime  @default(now())
+  caProfile     CAProfile @relation(fields: [caId], references: [userId], onDelete: Cascade)
+
+  @@unique([caId, date])
+  @@map("ca_availability_overrides")
+}
+
+model VideoCallRoom {
+  id              String    @id @default(uuid())
+  roomId          String    @unique
+  caId            String
+  clientId        String?
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  durationMinutes Int?
+  title           String?
+  agenda          String?
+  status          String    @default("SCHEDULED")
+  recordingUrl    String?
+  meetingNotes    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  ca              User      @relation(fields: [caId], references: [id])
+
+  @@map("video_call_rooms")
+}
+
+model Review {
+  id                 String    @id @default(uuid())
+  caId               String
+  clientId           String
+  rating             Int
+  title              String?
+  content            String?
+  status             String    @default("PENDING")
+  communicationRating Int?
+  expertiseRating    Int?
+  timelinessRating   Int?
+  caResponse         String?
+  caRespondedAt      DateTime?
+  isVerified         Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  ca                 User      @relation("ReviewCA", fields: [caId], references: [id])
+  client             User      @relation("ReviewClient", fields: [clientId], references: [id])
+
+  @@unique([caId, clientId])
+  @@map("reviews")
+}
+
+model Note {
+  id         String    @id @default(uuid())
+  userId     String
+  clientId   String?
+  title      String?
+  content    String?
+  tags       String[]  @default([])
+  isPinned   Boolean   @default(false)
+  isArchived Boolean   @default(false)
+  color      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@map("notes")
+}
+
+model TeamMember {
+  id               String    @id @default(uuid())
+  caId             String
+  memberId         String
+  role             String    @default("STAFF")
+  customPermissions Json     @default("{}")
+  isActive         Boolean   @default(true)
+  joinedAt         DateTime  @default(now())
+  ca               User      @relation("TeamCA", fields: [caId], references: [id])
+  member           User      @relation("TeamMember", fields: [memberId], references: [id])
+
+  @@unique([caId, memberId])
+  @@map("team_members")
+}
+
+model TimeEntry {
+  id              String    @id @default(uuid())
+  userId          String
+  taskId          String?
+  clientId        String?
+  description     String?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int?
+  hourlyRate      Decimal?  @db.Decimal(10,2)
+  amount          Decimal?  @db.Decimal(12,2)
+  isBillable      Boolean   @default(true)
+  billed          Boolean   @default(false)
+  invoiceId       String?
+  createdAt       DateTime  @default(now())
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@map("time_entries")
+}
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  userId       String?
+  action       String
+  resourceType String
+  resourceId   String?
+  resourceName String?
+  oldValues    Json?
+  newValues    Json?
+  ipAddress    String?
+  caId         String?
+  clientId     String?
+  createdAt    DateTime  @default(now())
+  user         User?     @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model SupportTicket {
+  id           String    @id @default(uuid())
+  ticketNumber String    @unique
+  userId       String
+  subject      String
+  description  String
+  category     String?
+  priority     String    @default("medium")
+  status       String    @default("open")
+  assignedTo   String?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id])
+  replies      SupportTicketReply[]
+
+  @@map("support_tickets")
+}
+
+model SupportTicketReply {
+  id         String        @id @default(uuid())
+  ticketId   String
+  userId     String
+  content    String
+  isInternal Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("support_ticket_replies")
+}
+
+model UserSession {
+  id           String    @id @default(uuid())
+  userId       String
+  token        String    @unique
+  refreshToken String?   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  deviceName   String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model OAuthAccount {
+  id                String    @id @default(uuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model VerificationToken {
+  id         String    @id @default(uuid())
+  identifier String
+  token      String    @unique
+  type       String
+  expiresAt  DateTime
+  used       Boolean   @default(false)
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("verification_tokens")
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(uuid())
+  invoiceId   String
+  description String
+  hsnSacCode  String?
+  quantity    Decimal  @db.Decimal(10,3)
+  unit        String   @default("service")
+  rate        Decimal  @db.Decimal(12,2)
+  amount      Decimal  @db.Decimal(12,2)
+  taxRate     Decimal  @default(0) @db.Decimal(5,2)
+  taxAmount   Decimal  @default(0) @db.Decimal(12,2)
+  sortOrder   Int      @default(0)
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_line_items")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  content   String
+  editedAt  DateTime?
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_comments")
+}
+
+model TaskAttachment {
+  id         String   @id @default(uuid())
+  taskId     String
+  uploadedBy String
+  fileName   String
+  fileUrl    String
+  fileSize   Int?
+  mimeType   String?
+  createdAt  DateTime @default(now())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_attachments")
+}
+
+model TaskTimeLog {
+  id              String    @id @default(uuid())
+  taskId          String
+  userId          String
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_time_logs")
+}
+
+model DocumentFolder {
+  id        String           @id @default(uuid())
+  caId      String
+  clientId  String?
+  parentId  String?
+  name      String
+  color     String?
+  isShared  Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  parent    DocumentFolder?  @relation("FolderChildren", fields: [parentId], references: [id])
+  children  DocumentFolder[] @relation("FolderChildren")
+  documents Document[]
+
+  @@map("document_folders")
+}
+
+model NotificationPreference {
+  id                      String    @id @default(uuid())
+  userId                  String    @unique
+  emailEnabled            Boolean   @default(true)
+  pushEnabled             Boolean   @default(true)
+  inAppEnabled            Boolean   @default(true)
+  taskNotifications       Boolean   @default(true)
+  invoiceNotifications    Boolean   @default(true)
+  paymentNotifications    Boolean   @default(true)
+  documentNotifications   Boolean   @default(true)
+  appointmentNotifications Boolean  @default(true)
+  messageNotifications    Boolean   @default(true)
+  filingNotifications     Boolean   @default(true)
+  marketingEmails         Boolean   @default(true)
+  updatedAt               DateTime  @updatedAt
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+
+model Expense {
+  id                 String          @id @default(uuid())
+  userId             String
+  clientId           String?
+  title              String
+  amount             Decimal         @db.Decimal(12,2)
+  category           ExpenseCategory @default(OTHER)
+  expenseDate        DateTime        @db.Date
+  isTaxDeductible    Boolean         @default(false)
+  gstAmount          Decimal         @default(0) @db.Decimal(10,2)
+  receiptUrl         String?
+  isRecurring        Boolean         @default(false)
+  recurringFrequency String?
+  nextExpenseDate    DateTime?       @db.Date
+  vendorName         String?
+  tags               String[]        @default([])
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  user               User            @relation(fields: [userId], references: [id])
+
+  @@map("expenses")
+}
+
+model SubscriptionPlan {
+  id                    String           @id @default(uuid())
+  name                  SubscriptionPlanEnum @unique
+  displayName           String
+  description           String?
+  priceMonthly          Decimal          @db.Decimal(10,2)
+  priceYearly           Decimal          @db.Decimal(10,2)
+  maxClients            Int?
+  maxStorageGb          Int?
+  maxStaffMembers       Int?
+  maxInvoicesPerMonth   Int?
+  maxVideoCallHoursPerMonth Int?
+  features              Json             @default("{}")
+  isActive              Boolean          @default(true)
+  isFeatured            Boolean          @default(false)
+  sortOrder             Int              @default(0)
+  createdAt             DateTime         @default(now())
+
+  @@map("subscription_plans")
+}
+
+enum SubscriptionPlanEnum {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+model ComplianceCalendar {
+  id            String     @id @default(uuid())
+  title         String
+  description   String?
+  filingType    FilingType?
+  dueDate       DateTime   @db.Date
+  applicableTo  String[]   @default([])
+  isRecurring   Boolean    @default(true)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+
+  @@map("compliance_calendar")
+}
+
+model FAQ {
+  id         String   @id @default(uuid())
+  question   String
+  answer     String
+  category   String?
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@map("faqs")
+}
+
+model BlogPost {
+  id           String    @id @default(uuid())
+  authorId     String
+  slug         String    @unique
+  title        String
+  excerpt      String?
+  content      String
+  coverImageUrl String?
+  tags         String[]  @default([])
+  category     String?
+  isPublished  Boolean   @default(false)
+  publishedAt  DateTime?
+  viewCount    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  author       User      @relation(fields: [authorId], references: [id])
+
+  @@map("blog_posts")
+}
+
+model FeatureFlag {
+  id             String   @id @default(uuid())
+  name           String   @unique
+  description    String?
+  isEnabled      Boolean  @default(false)
+  enabledForRoles String[] @default([])
+  createdAt      DateTime @default(now())
+
+  @@map("feature_flags")
+}
+
+model PlatformSettings {
+  key         String   @id
+  value       Json
+  description String?
+  isPublic    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  @@map("platform_settings")
+}

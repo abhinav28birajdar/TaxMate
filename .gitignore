@@ -39,3 +39,50 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQL files and database
+*.sql
+supabase/
+*.sqlite
+*.db
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# Optional npm cache directory
+.npm
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Local development
+.tmp
+tmp/
