@@ -68,3 +68,6 @@ export function getStorageStats(): { size: number; keys: number } {
     keys: store.size,
   };
 }
+
+// Alias for API endpoints
+export const enforceRateLimit = checkRateLimit;

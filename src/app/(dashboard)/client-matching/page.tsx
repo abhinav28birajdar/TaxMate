@@ -172,8 +172,8 @@ export default function ClientMatchingPage() {
                         <p className="font-semibold text-slate-900">{ca.clients}</p>
                       </div>
                       <div>
-                        <span className="text-slate-600">Rating:</span>
-                        <p className="font-semibold text-slate-900">⭐ {ca.avgRating}/5</p>
+                        <span className="text-slate-600">Experience:</span>
+                        <p className="font-semibold text-slate-900">{ca.experience} years</p>
                       </div>
                       <div>
                         <span className="text-slate-600">Availability:</span>
@@ -230,7 +230,7 @@ export default function ClientMatchingPage() {
                 <p className="text-sm text-slate-600 mb-2">Specializations:</p>
                 <div className="flex flex-wrap gap-2">
                   {ca.specialties.map((specialty) => (
-                    <Badge key={specialty} variant="default">
+                    <Badge key={specialty} variant="primary">
                       {specialty}
                     </Badge>
                   ))}

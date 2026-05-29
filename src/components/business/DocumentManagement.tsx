@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { useRouter } from 'next/navigation';
 
 // Document management component for business users
 export default function DocumentManagement() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [uploadingFile, setUploadingFile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,7 +20,7 @@ export default function DocumentManagement() {
       type: 'pdf',
       size: '2.4 MB',
       category: 'registration',
-      uploadedBy: profile?.displayName || 'Admin User',
+      uploadedBy: (user as any)?.name || 'Admin User',
       uploadedAt: '2023-12-01T10:30:00.000Z',
       shared: false,
     },
@@ -30,7 +30,7 @@ export default function DocumentManagement() {
       type: 'xlsx',
       size: '1.8 MB',
       category: 'financial',
-      uploadedBy: profile?.displayName || 'Admin User',
+      uploadedBy: (user as any)?.name || 'Admin User',
       uploadedAt: '2023-11-15T14:20:00.000Z',
       shared: true,
     },
@@ -40,7 +40,7 @@ export default function DocumentManagement() {
       type: 'pdf',
       size: '3.6 MB',
       category: 'tax',
-      uploadedBy: profile?.displayName || 'Admin User',
+      uploadedBy: (user as any)?.name || 'Admin User',
       uploadedAt: '2023-10-30T09:45:00.000Z',
       shared: false,
     }
@@ -74,7 +74,7 @@ export default function DocumentManagement() {
         type: file.name.split('.').pop() || '',
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
         category: 'registration', // Default category
-        uploadedBy: profile?.displayName || 'Admin User',
+        uploadedBy: (user as any)?.name || 'Admin User',
         uploadedAt: new Date().toISOString(),
         shared: false,
       };

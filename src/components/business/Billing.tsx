@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { useRouter } from 'next/navigation';
 
 interface BillingProps {}
 
 // Business billing and payments component
 export default function Billing({}: BillingProps) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -419,7 +419,7 @@ export default function Billing({}: BillingProps) {
                   name="company-name"
                   id="company-name"
                   className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                  placeholder={profile?.businessName || 'Your company name'}
+                  placeholder={(user as any)?.name || 'Your company name'}
                 />
               </div>
             </div>

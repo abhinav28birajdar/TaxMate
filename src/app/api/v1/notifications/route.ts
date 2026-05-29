@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.role, ['admin', 'moderator']);
+    ensureRole(auth.roles, ['admin', 'moderator']);
 
     const body = await request.json();
     const parsed = notificationCreateSchema.parse(body);
@@ -54,10 +54,10 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('notifications')
       .insert({
-        user_id: parsed.userId,
+        user_id: auth.userId,
         type: parsed.type,
         title: parsed.title,
-        message: parsed.message,
+        message: parsed.body,
         metadata: parsed.metadata || {},
         is_read: false,
       })

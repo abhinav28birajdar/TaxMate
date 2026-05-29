@@ -156,12 +156,12 @@ export default function TeamPage() {
                         <p className="font-semibold text-gray-900">{member.name}</p>
                         <p className="text-sm text-gray-600">{member.designation}</p>
                         <div className="flex gap-2 mt-1">
-                          <badge className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                          <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
                             {member.department}
-                          </badge>
-                          <badge className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
                             Active
-                          </badge>
+                          </span>
                         </div>
                       </div>
                     </div>

@@ -7,7 +7,7 @@ import { featureFlagSchema } from '@/lib/backend/validation';
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.role, ['admin']);
+    ensureRole(auth.roles, ['admin']);
 
     const { data, error } = await supabaseAdmin
       .from('feature_flags')
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.role, ['admin']);
+    ensureRole(auth.roles, ['admin']);
 
     const body = await request.json();
     const parsed = featureFlagSchema.parse(body);
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         {
           key: parsed.key,
           description: parsed.description,
-          enabled: parsed.enabled,
+          enabled: parsed.isEnabled,
           rollout_percentage: parsed.rolloutPercentage,
         },
         { onConflict: 'key' }

@@ -9,7 +9,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 export type MessageType = 'text' | 'file' | 'image' | 'voice' | 'system';

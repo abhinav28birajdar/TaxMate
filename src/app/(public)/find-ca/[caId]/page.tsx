@@ -109,7 +109,7 @@ export default function CAProfilePage() {
                                 </div>
                                 <div>
                                     <p className="text-slate-400 text-xs">Location</p>
-                                    <p className="font-semibold">{ca.office_address?.city || 'India'}</p>
+                                    <p className="font-semibold">{(ca as any).city || (ca as any).state || 'India'}</p>
                                 </div>
                                 <div>
                                     <p className="text-slate-400 text-xs">Membership</p>
@@ -148,16 +148,16 @@ export default function CAProfilePage() {
                         <div className="grid grid-cols-3 gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border shadow-sm text-center">
                             <div>
                                 <p className="text-2xl font-bold flex items-center justify-center gap-1">
-                                    {ca.average_rating || '5.0'} <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                                    {(ca as any).average_rating || (ca as any).rating || '5.0'} <Star className="w-5 h-5 text-amber-500 fill-amber-500" />       
                                 </p>
                                 <p className="text-xs text-slate-500">Average Rating</p>
                             </div>
                             <div className="border-l border-r">
-                                <p className="text-2xl font-bold">{ca.total_clients || 0}+</p>
+                                <p className="text-2xl font-bold">{(ca as any).total_clients || 0}+</p>
                                 <p className="text-xs text-slate-500">Happy Clients</p>
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{ca.completed_cases || 0}+</p>
+                                <p className="text-2xl font-bold">{(ca as any).completed_cases || 0}+</p>
                                 <p className="text-xs text-slate-500">Cases Solved</p>
                             </div>
                         </div>

@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 // Business compliance calendar component
 export default function ComplianceCalendar() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [view, setView] = useState('list'); // 'list' or 'calendar'
   const [currentMonth, setCurrentMonth] = useState(new Date());

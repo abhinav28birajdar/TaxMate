@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import Link from 'next/link';
 
 export default function CustomerDashboard() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   return (
@@ -25,7 +25,7 @@ export default function CustomerDashboard() {
                   <div className="flex items-center">
                     <div className="ml-3">
                       <div className="text-base font-medium text-gray-800 dark:text-gray-200">
-                        {profile?.displayName || user?.email?.split('@')[0]}
+                        {(user as any)?.name || user?.email?.split('@')[0]}
                       </div>
                       <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                         {user?.email}
@@ -232,7 +232,7 @@ export default function CustomerDashboard() {
               {activeTab === 'dashboard' && (
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    Welcome back, {profile?.displayName || user?.email?.split('@')[0]}!
+                    Welcome back, {(user as any)?.name || user?.email?.split('@')[0]}!
                   </h1>
                   <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     {/* Upcoming appointments */}
@@ -639,7 +639,7 @@ export default function CustomerDashboard() {
                             Full name
                           </dt>
                           <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:mt-0 sm:col-span-2">
-                            {profile?.displayName || 'Not set'}
+                            {(user as any)?.name || 'Not set'}
                           </dd>
                         </div>
                         <div className="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -655,7 +655,7 @@ export default function CustomerDashboard() {
                             Phone number
                           </dt>
                           <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:mt-0 sm:col-span-2">
-                            {profile?.phoneNumber || 'Not set'}
+                            {'Not set'}
                           </dd>
                         </div>
                         <div className="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -663,8 +663,8 @@ export default function CustomerDashboard() {
                             Account created
                           </dt>
                           <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:mt-0 sm:col-span-2">
-                            {profile?.createdAt
-                              ? new Date(profile.createdAt).toLocaleDateString()
+                            {user?.status
+                              ? 'Active'
                               : 'Unknown'}
                           </dd>
                         </div>

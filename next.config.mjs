@@ -124,11 +124,9 @@ const nextConfig = {
     ];
   },
 
-  // Experimental features
+  // Experimental features (minimal config for stability)
   experimental: {
-    // Enable some optimizations
     esmExternals: true,
-    isrMemoryCacheSize: 52 * 1024 * 1024, // 52MB
   },
 
   // Skip type checks during build (TypeScript already checked)

@@ -6,10 +6,10 @@ import { cn } from '@/lib/utils';
 import {
     LayoutDashboard,
     MessageSquare,
-    Briefcase,
+    CreditCard,
     FileText,
     Calendar,
-    CreditCard,
+    DollarSign,
     Settings,
     Users,
     LogOut,
@@ -20,7 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const caLinks = [
@@ -84,7 +84,7 @@ const CyberCorner = ({ position }: { position: 'top-left' | 'top-right' | 'botto
     };
 
     return (
-        <div className={`absolute w-1.5 h-1.5 ${positions[position]} border-primary opacity-50`} />
+        <div className={`absolute w-1.5 h-1.5 ${positions[position]} border-green-500 opacity-50`} />
     );
 };
 
@@ -112,17 +112,17 @@ export function DashboardSidebar() {
     const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
     return (
-        <div className="hidden lg:flex flex-col h-full border-r border-primary/10 bg-black w-64 relative group">
+        <div className="hidden lg:flex flex-col h-full border-r border-green-500/10 bg-black w-64 relative group">
             {/* Header */}
-            <div className="h-16 flex items-center px-6 border-b border-primary/10 relative">
+            <div className="h-16 flex items-center px-6 border-b border-green-500/10 relative">
                 <Link href="/dashboard" className="flex items-center gap-3 font-black text-xl tracking-tighter uppercase italic text-foreground group/logo">
-                    <div className="relative w-8 h-8 bg-primary/10 border border-primary/30 rounded flex items-center justify-center group-hover/logo:border-primary transition-colors">
-                        <Briefcase className="w-4 h-4 text-primary" />
-                        <div className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-primary" />
-                        <div className="absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-primary" />
+                    <div className="relative w-8 h-8 bg-green-500/10 border border-green-500/30 rounded flex items-center justify-center group-hover/logo:border-green-500 transition-colors">
+                        <CreditCard className="w-4 h-4 text-green-400" />
+                        <div className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-green-500" />
+                        <div className="absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-green-500" />
                     </div>
                     <span className="text-foreground">
-                        Tax<span className="text-primary">Mate</span>
+                        Fin<span className="text-green-400">Bank</span>
                     </span>
                 </Link>
             </div>
@@ -133,7 +133,7 @@ export function DashboardSidebar() {
                     {links.map((section) => (
                         <div key={section.section} className="space-y-1">
                             <div className="px-3 mb-2">
-                                <span className="text-[10px] uppercase tracking-[0.3em] font-black text-primary/50">
+                                <span className="text-[10px] uppercase tracking-[0.3em] font-black text-green-500/50">
                                     {section.section}
                                 </span>
                             </div>
@@ -147,17 +147,17 @@ export function DashboardSidebar() {
                                             className={cn(
                                                 "w-full justify-start gap-4 h-11 transition-all rounded-none border-l-2",
                                                 isActive
-                                                    ? "bg-primary/5 text-primary border-primary font-black italic uppercase tracking-widest text-[11px]"
+                                                    ? "bg-green-500/5 text-green-400 border-green-500 font-black italic uppercase tracking-widest text-[11px]"
                                                     : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/5 font-bold uppercase tracking-widest text-[11px]"
                                             )}
                                         >
                                             <link.icon className={cn(
                                                 "w-4 h-4",
-                                                isActive ? "text-primary animate-pulse" : "text-muted-foreground"
+                                                isActive ? "text-green-400 animate-pulse" : "text-muted-foreground"
                                             )} />
                                             {link.label}
                                             {link.label === 'Messages' && (
-                                                <div className="ml-auto w-2 h-2 bg-primary animate-ping rounded-full" />
+                                                <div className="ml-auto w-2 h-2 bg-green-500 animate-ping rounded-full" />
                                             )}
                                             {isActive && <ChevronRight className="ml-auto h-3 w-3 animate-in fade-in slide-in-from-left-2" />}
                                         </Button>
@@ -176,22 +176,22 @@ export function DashboardSidebar() {
             </ScrollArea>
 
             {/* User Section */}
-            <div className="p-4 border-t border-primary/10 space-y-4">
-                <div className="relative p-3 bg-white/5 border border-primary/5 hover:border-primary/20 transition-all rounded-none group/user overflow-hidden">
+            <div className="p-4 border-t border-green-500/10 space-y-4">
+                <div className="relative p-3 bg-white/5 border border-green-500/5 hover:border-green-500/20 transition-all rounded-none group/user overflow-hidden">
                     <div className="flex items-center gap-3 relative z-10">
                         <div className="relative">
-                            <Avatar className="h-10 w-10 border border-primary/20 rounded-none p-0.5">
+                            <Avatar className="h-10 w-10 border border-green-500/20 rounded-none p-0.5">
                                 <AvatarImage src={avatarUrl} className="rounded-none object-cover" />
-                                <AvatarFallback className="bg-primary/10 text-primary font-black italic rounded-none">
+                                <AvatarFallback className="bg-green-500/10 text-green-400 font-black italic rounded-none">
                                     {displayName[0]?.toUpperCase()}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-primary border-2 border-black rounded-full" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-black rounded-full" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-xs font-black uppercase italic tracking-wider truncate text-foreground">{displayName}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                                <div className="w-1 h-1 bg-primary rounded-full animate-pulse" />
+                                <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
                                 <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold truncate">
                                     {role === 'ca' ? 'Operator: 01' : 'Level: 01'}
                                 </p>
@@ -202,7 +202,7 @@ export function DashboardSidebar() {
 
                 <Button
                     variant="ghost"
-                    className="w-full justify-start gap-3 h-10 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-none font-bold uppercase tracking-widest text-[10px] transition-all"
+                    className="w-full justify-start gap-3 h-10 text-muted-foreground hover:text-green-400 hover:bg-green-500/5 rounded-none font-bold uppercase tracking-widest text-[10px] transition-all"
                     onClick={signOut}
                 >
                     <LogOut className="w-3.5 h-3.5" />

@@ -147,6 +147,8 @@ export function useSupabaseSubscription(
   const [error, setError] = useState<any>(null);
 
   useEffect(() => {
+    if (!supabase) return;
+    
     const subscription = supabase
       .channel(`table-changes-${table}`)
       .on(

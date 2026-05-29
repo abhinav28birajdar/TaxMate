@@ -4,7 +4,7 @@ import { createAuditLog, invalidateUserSession } from '@/lib/auth-service';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get session token from cookie
     const sessionToken = request.cookies.get('sessionToken')?.value;

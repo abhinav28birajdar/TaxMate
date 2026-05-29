@@ -216,7 +216,7 @@ export default function IntegrationsMarketplacePage() {
                     <p className="text-xs text-slate-600">{setting.frequency}</p>
                   </div>
                 </div>
-                <Badge variant={setting.enabled ? 'success' : 'default'}>
+                <Badge variant={setting.enabled ? 'success' : 'neutral'}>
                   {setting.enabled ? 'On' : 'Off'}
                 </Badge>
               </div>

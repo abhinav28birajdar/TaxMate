@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { clientService, invoiceService, taskService, activityService } from '@/src/lib/services';
+import { clientService, invoiceService, taskService, activityService } from '@/lib/services';
 import {
   Card,
   StatCard,
@@ -9,8 +9,8 @@ import {
   Badge,
   LoadingSpinner,
   Button,
-} from '@/src/components/ui/core-components';
-import { colors } from '@/src/theme/design-system';
+} from '@/components/ui/core-components';
+import { colors } from '@/theme/design-system';
 
 // ============================================================================
 // CA DASHBOARD COMPONENT
@@ -209,9 +209,7 @@ export const CADashboard: React.FC<{ caId: string }> = ({ caId }) => {
                 <div key={activity.id} className="pb-3 border-b" style={{ borderColor: colors.neutral[200] }}>
                   <p className="text-sm font-medium">{activity.title}</p>
                   <p style={{ color: colors.neutral[600] }} className="text-xs mt-1">
-                    {new Date(activity.created_at).toRelativeTime ? 
-                      new Date(activity.created_at).toRelativeTime() : 
-                      new Date(activity.created_at).toLocaleDateString()}
+                    {new Date(activity.created_at).toLocaleDateString()}
                   </p>
                 </div>
               ))}

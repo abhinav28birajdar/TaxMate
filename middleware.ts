@@ -1,96 +1,76 @@
-import { type NextRequest, NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyAccessToken } from './src/lib/backend/jwt';
+import { extractBearerToken } from './src/lib/backend/jwt';
 
-// Protected routes that require authentication
-const PROTECTED_ROUTES = [
-  '/dashboard',
-  '/profile',
-  '/settings',
-  '/documents',
-  '/invoices',
-  '/tasks',
-  '/clients',
-  '/team',
-  '/analytics',
-  '/compliance',
-  '/recommended',
-];
-
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = [
+const PUBLIC_PATHS = [
+  '/',
   '/login',
-  '/register',
+  '/signup',
   '/forgot-password',
   '/reset-password',
-  '/verify-email',
-  '/auth',
+  '/api/v1/auth/signup',
+  '/api/v1/auth/login',
+  '/api/v1/auth/forgot-password',
+  '/api/v1/auth/reset-password',
 ];
+const ADMIN_PATHS = ['/admin', '/api/v1/admin', '/api/v1/activity'];
 
-export async function middleware(request: NextRequest) {
-  const requestId = randomUUID();
-  const startTime = Date.now();
+export async function middleware(req: NextRequest) {
+  const path = req.nextUrl.pathname;
 
-  const pathname = request.nextUrl.pathname;
-
-  // Clone response to add headers
-  let response = NextResponse.next();
-
-  // Add security headers
-  response.headers.set('X-Content-Type-Options', 'nosniff');
-  response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-XSS-Protection', '1; mode=block');
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.headers.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-
-  // Add request ID for tracing
-  response.headers.set('X-Request-ID', requestId);
-
-  // Check authentication for protected routes
-  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
-  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route));
-
-  if (isProtectedRoute) {
-    // Check for session token in cookies
-    const sessionToken = request.cookies.get('sessionToken')?.value;
-    const authToken = request.cookies.get('auth-token')?.value;
-
-    if (!sessionToken && !authToken) {
-      // Redirect to login
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirectTo', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
+  // Allow public paths
+  if (PUBLIC_PATHS.some(p => path.startsWith(p))) {
+    return NextResponse.next();
   }
 
-  // Redirect authenticated users away from auth pages
-  if (isPublicRoute) {
-    const sessionToken = request.cookies.get('sessionToken')?.value;
-    const authToken = request.cookies.get('auth-token')?.value;
+  // Extract token from header or cookie
+  let token = req.cookies.get('access_token')?.value;
+  if (!token) {
+    token = extractBearerToken(req.headers.get('Authorization'));
+  }
 
-    if (sessionToken || authToken) {
-      // User is already authenticated, redirect to dashboard
-      if (pathname === '/login' || pathname === '/register') {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+  if (!token) {
+    // Redirect to login if accessing protected page
+    if (path.startsWith('/') && !path.startsWith('/api')) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+    // Return 401 for API endpoints
+    return new NextResponse(JSON.stringify({ success: false, message: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  try {
+    const payload = await verifyAccessToken(token);
+
+    // Check admin paths
+    if (ADMIN_PATHS.some(p => path.startsWith(p))) {
+      if (!payload.roles?.includes('admin')) {
+        return NextResponse.redirect(new URL('/dashboard', req.url));
       }
     }
+
+    // Add user info to headers
+    const headers = new Headers(req.headers);
+    headers.set('x-user-id', payload.userId || '');
+    headers.set('x-user-email', (payload.email as string) || '');
+    headers.set('x-user-roles', JSON.stringify(payload.roles || []));
+
+    return NextResponse.next({ request: { headers } });
+  } catch (error) {
+    // Redirect to login on token verification failure
+    if (path.startsWith('/') && !path.startsWith('/api')) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+    return new NextResponse(JSON.stringify({ success: false, message: 'Authentication failed' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
-
-  // Log request
-  const duration = Date.now() - startTime;
-  console.log(`[${requestId}] ${request.method} ${pathname} - ${response.status} (${duration}ms)`);
-
-  return response;
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
+

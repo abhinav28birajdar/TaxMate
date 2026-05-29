@@ -158,8 +158,8 @@ export default function AIDocumentProcessingPage() {
                     doc.status === 'completed'
                       ? 'success'
                       : doc.status === 'processing'
-                      ? 'default'
-                      : 'alert'
+                      ? 'warning'
+                      : 'danger'
                   }
                 >
                   {doc.status === 'completed'

@@ -11,11 +11,14 @@ import { toast } from '@/components/ui/use-toast';
 import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { createClient } from '@/utils/supabase/client';
+import { signUpSchema } from '@/lib/validators-unified';
+import type { SignUpInput } from '@/lib/validators-unified';
 
 export default function CARegisterPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
     // Step 1 Data
     const [formData, setFormData] = useState({
@@ -28,30 +31,40 @@ export default function CARegisterPage() {
         acceptedTerms: false
     });
 
+    const validateForm = () => {
+        setErrors({});
+        
+        // Combine names for validation
+        const combinedName = `${formData.firstName} ${formData.lastName}`.trim();
+        
+        const result = signUpSchema.safeParse({
+            name: combinedName,
+            email: formData.email,
+            password: formData.password,
+            confirmPassword: formData.confirmPassword,
+            role: 'CA',
+            agreeToTerms: formData.acceptedTerms,
+        });
+
+        if (!result.success) {
+            const formErrors: typeof errors = {};
+            result.error.issues.forEach(issue => {
+                const field = issue.path[0] as string;
+                formErrors[field] = issue.message;
+            });
+            setErrors(formErrors);
+            return false;
+        }
+        return true;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (formData.password !== formData.confirmPassword) {
+        if (!validateForm()) {
             toast({
-                title: "Passwords do not match",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        if (formData.password.length < 8) {
-            toast({
-                title: "Password is too short",
-                description: "Password must be at least 8 characters long",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        if (!formData.acceptedTerms) {
-            toast({
-                title: "Terms Required",
-                description: "Please accept the terms and conditions",
+                title: "Validation Error",
+                description: "Please check the form for errors",
                 variant: "destructive"
             });
             return;
@@ -89,7 +102,7 @@ export default function CARegisterPage() {
                 });
 
                 // Redirect to onboarding to complete profile
-                router.push('/onboarding/ca');
+                router.push('/auth/onboarding/ca');
             }
 
         } catch (error: any) {
@@ -138,6 +151,7 @@ export default function CARegisterPage() {
                                 placeholder="John"
                                 value={formData.firstName}
                                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                                className={errors.name ? 'border-red-500' : ''}
                             />
                         </div>
                         <div className="space-y-2">
@@ -148,9 +162,11 @@ export default function CARegisterPage() {
                                 placeholder="Doe"
                                 value={formData.lastName}
                                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                                className={errors.name ? 'border-red-500' : ''}
                             />
                         </div>
                     </div>
+                    {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
 
                     <div className="space-y-2">
                         <Label htmlFor="email">Email Address</Label>
@@ -161,7 +177,9 @@ export default function CARegisterPage() {
                             placeholder="john@example.com"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            className={errors.email ? 'border-red-500' : ''}
                         />
+                        {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -192,6 +210,7 @@ export default function CARegisterPage() {
                                 placeholder="Create a strong password"
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                className={errors.password ? 'border-red-500' : ''}
                             />
                             <Button
                                 type="button"
@@ -207,8 +226,9 @@ export default function CARegisterPage() {
                                 )}
                             </Button>
                         </div>
+                        {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
                         <p className="text-[0.8rem] text-muted-foreground">
-                            Must be at least 8 characters.
+                            Must be at least 8 characters, with uppercase, lowercase, and numbers.
                         </p>
                     </div>
 
@@ -221,10 +241,12 @@ export default function CARegisterPage() {
                             placeholder="Confirm your password"
                             value={formData.confirmPassword}
                             onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                            className={errors.confirmPassword ? 'border-red-500' : ''}
                         />
+                        {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-start space-x-2">
                         <Checkbox
                             id="terms"
                             checked={formData.acceptedTerms}
@@ -232,11 +254,12 @@ export default function CARegisterPage() {
                         />
                         <label
                             htmlFor="terms"
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            className="text-sm font-medium leading-relaxed peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                         >
                             I accept the <Link href="/terms" className="text-primary hover:underline">Terms & Conditions</Link>
                         </label>
                     </div>
+                    {errors.agreeToTerms && <p className="text-sm text-red-500">{errors.agreeToTerms}</p>}
                 </div>
 
                 <Button type="submit" className="w-full" size="lg" disabled={loading}>

@@ -6,8 +6,8 @@ import {
     Compass, FileUp, Bell, Search,
     Calendar, CheckCircle, ChevronRight, Zap
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 const clientSteps = [
     {

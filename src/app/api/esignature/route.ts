@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
  * POST /api/esignature/sign
  * Sign a document
  */
-export async function signDocument(req: NextRequest) {
+async function signDocument(req: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();

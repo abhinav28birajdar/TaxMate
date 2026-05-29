@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
 
-    if (auth.role === 'user') {
+    if (!auth.roles.includes('user') && !auth.roles.includes('client')) {
       query = query.eq('created_by', auth.userId);
     }
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       .insert({
         created_by: auth.userId,
         subject: parsed.subject,
-        description: parsed.description,
+        description: parsed.body,
         priority: parsed.priority,
         status: 'open',
       })
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.role, ['admin', 'moderator']);
+    ensureRole(auth.roles, ['admin', 'moderator']);
 
     const body = await request.json();
     const ticketId = body.ticketId as string;

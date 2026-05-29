@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { token } = validation.data;
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Find verification token
     const { data: verificationData, error: verificationError } = await supabase

@@ -1,360 +1,479 @@
-import { hashSync, compareSync } from 'bcryptjs';
-import { createHash } from 'crypto';
-import { getServiceClient } from './supabase';
-import { signAccessToken } from './jwt';
+import { createClient } from '@supabase/supabase-js';
+import * as bcrypt from 'bcryptjs';
 import { env } from './env';
-import { conflict, unauthorized, notFound, internalError } from './errors';
-import { logActivity } from './audit';
+import { AppError, conflict, unauthorized, notFound, internalError } from './errors';
+import { signAccessToken } from './jwt';
+import { logActivity, logAudit } from './audit';
 
-interface SignupData {
+const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+
+export interface SignupInput {
   email: string;
   password: string;
   fullName?: string;
 }
 
-interface LoginData {
+export interface LoginInput {
   email: string;
   password: string;
-  ipAddress?: string;
+  deviceInfo?: string;
+  ipAddress: string;
   userAgent?: string;
 }
 
-interface AuthResult {
+export interface AuthResult {
   userId: string;
   email: string;
-  fullName?: string;
-  token: string;
-  sessionId: string;
+  token?: string;
+  sessionId?: string;
 }
 
-function hashPassword(password: string): string {
-  return hashSync(password, env.BCRYPT_SALT_ROUNDS);
-}
+/**
+ * Signup: Create new user account
+ */
+export async function signup(input: SignupInput): Promise<AuthResult> {
+  try {
+    // Check if email already exists
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', input.email.toLowerCase())
+      .maybeSingle();
 
-function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
-}
+    if (existingUser) {
+      throw conflict('Email already registered');
+    }
 
-export async function signup(data: SignupData): Promise<{ userId: string; email: string }> {
-  const client = getServiceClient();
-  const emailLower = data.email.toLowerCase();
+    // Hash password
+    const passwordHash = await bcrypt.hash(input.password, env.BCRYPT_SALT_ROUNDS);
 
-  // Check if email already exists
-  const { data: existing, error: checkError } = await client
-    .from('users')
-    .select('id')
-    .eq('email', emailLower)
-    .maybeSingle();
+    // Create user
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .insert({
+        email: input.email.toLowerCase(),
+        password_hash: passwordHash,
+        is_verified: false,
+        is_locked: false,
+        failed_login_attempts: 0,
+      })
+      .select()
+      .single();
 
-  if (checkError) {
-    throw internalError('Database error during signup');
-  }
+    if (userError || !user) {
+      throw internalError('Failed to create user');
+    }
 
-  if (existing) {
-    throw conflict('Email already registered');
-  }
-
-  const passwordHash = hashPassword(data.password);
-
-  // Create user
-  const { data: user, error: userError } = await client
-    .from('users')
-    .insert({
-      email: emailLower,
-      password_hash: passwordHash,
-    })
-    .select('id, email')
-    .single();
-
-  if (userError || !user) {
-    throw internalError('Failed to create user account');
-  }
-
-  // Create profile
-  const { error: profileError } = await client
-    .from('profiles')
-    .insert({
+    // Create profile
+    const { error: profileError } = await supabaseAdmin.from('profiles').insert({
       user_id: user.id,
-      full_name: data.fullName,
+      full_name: input.fullName || null,
+      is_public: false,
     });
 
-  if (profileError) {
-    console.error('Profile creation error:', profileError);
-  }
+    if (profileError) {
+      console.error('Profile creation error:', profileError);
+    }
 
-  // Create onboarding record
-  const { error: onboardingError } = await client
-    .from('onboarding_data')
-    .insert({
+    // Assign 'user' role
+    const { data: roleData } = await supabaseAdmin
+      .from('roles')
+      .select('id')
+      .eq('name', 'user')
+      .single();
+
+    if (roleData) {
+      await supabaseAdmin.from('user_roles').insert({
+        user_id: user.id,
+        role_id: roleData.id,
+      });
+    }
+
+    // Create onboarding data
+    const { error: onboardError } = await supabaseAdmin.from('onboarding_data').insert({
       user_id: user.id,
       current_step: 1,
-      total_steps: 5,
+      completed_steps: [],
+      is_complete: false,
+      data: {},
     });
 
-  if (onboardingError) {
-    console.error('Onboarding creation error:', onboardingError);
-  }
-
-  // Create user settings
-  const { error: settingsError } = await client
-    .from('user_settings')
-    .insert({
-      user_id: user.id,
-    });
-
-  if (settingsError) {
-    console.error('Settings creation error:', settingsError);
-  }
-
-  // Assign user role
-  const { data: userRole } = await client
-    .from('roles')
-    .select('id')
-    .eq('name', 'user')
-    .single();
-
-  if (userRole) {
-    const { error: roleError } = await client
-      .from('user_roles')
-      .insert({
-        user_id: user.id,
-        role_id: userRole.id,
-      });
-
-    if (roleError) {
-      console.error('Role assignment error:', roleError);
+    if (onboardError) {
+      console.error('Onboarding data creation error:', onboardError);
     }
+
+    // Create user settings
+    const { error: settingsError } = await supabaseAdmin.from('user_settings').insert({
+      user_id: user.id,
+      theme: 'system',
+      language: 'en',
+      timezone: 'UTC',
+      email_notifications: true,
+      push_notifications: false,
+    });
+
+    if (settingsError) {
+      console.error('User settings creation error:', settingsError);
+    }
+
+    // Log activity
+    await logActivity({
+      userId: user.id,
+      action: 'user_signup',
+      ipAddress: '0.0.0.0',
+    });
+
+    return {
+      userId: user.id,
+      email: user.email,
+    };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw internalError('Signup failed');
   }
-
-  // Log activity
-  await logActivity(user.id, 'signup', 'user', user.id);
-
-  return {
-    userId: user.id,
-    email: user.email,
-  };
 }
 
-export async function login(data: LoginData): Promise<AuthResult> {
-  const client = getServiceClient();
-  const emailLower = data.email.toLowerCase();
+/**
+ * Login: Authenticate user and create session
+ */
+export async function login(input: LoginInput): Promise<AuthResult> {
+  try {
+    // Fetch user by email
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('email', input.email.toLowerCase())
+      .maybeSingle();
 
-  // Find user
-  const { data: user, error: userError } = await client
-    .from('users')
-    .select('id, email, password_hash, is_active, is_locked, locked_until, failed_login_attempts')
-    .eq('email', emailLower)
-    .maybeSingle();
-
-  if (userError || !user) {
-    throw unauthorized('Invalid credentials');
-  }
-
-  if (!user.is_active) {
-    throw unauthorized('Account is inactive');
-  }
-
-  // Check if account is locked
-  if (user.is_locked && user.locked_until) {
-    const lockedUntil = new Date(user.locked_until);
-    if (lockedUntil > new Date()) {
-      throw unauthorized('Account is temporarily locked. Try again later.');
+    if (userError || !user) {
+      throw unauthorized('Invalid credentials');
     }
-  }
 
-  // Verify password
-  const isPasswordValid = compareSync(data.password, user.password_hash || '');
+    // Check if account is locked
+    if (user.is_locked) {
+      throw new AppError('Account is locked', 423, 'ACCOUNT_LOCKED');
+    }
 
-  if (!isPasswordValid) {
-    const newFailedAttempts = (user.failed_login_attempts || 0) + 1;
-    const shouldLock = newFailedAttempts >= 5;
-    const lockedUntil = shouldLock
-      ? new Date(Date.now() + 15 * 60 * 1000).toISOString()
-      : null;
+    // Verify password
+    const passwordValid = await bcrypt.compare(input.password, user.password_hash);
 
-    await client
+    if (!passwordValid) {
+      // Increment failed attempts
+      const newAttempts = (user.failed_login_attempts || 0) + 1;
+      const shouldLock = newAttempts >= 5;
+
+      await supabaseAdmin
+        .from('users')
+        .update({
+          failed_login_attempts: newAttempts,
+          is_locked: shouldLock,
+          locked_at: shouldLock ? new Date().toISOString() : null,
+        })
+        .eq('id', user.id);
+
+      if (shouldLock) {
+        throw new AppError('Account is locked due to too many failed login attempts', 423, 'ACCOUNT_LOCKED');
+      }
+
+      throw unauthorized('Invalid credentials');
+    }
+
+    // Get user roles
+    const { data: userRoles } = await supabaseAdmin
+      .from('user_roles')
+      .select('roles (name)')
+      .eq('user_id', user.id);
+
+    const roles = userRoles?.map((ur: any) => ur.roles.name) || ['user'];
+
+    // Create session
+    const tokenHash = await bcrypt.hash(Math.random().toString(), 10);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from('sessions')
+      .insert({
+        user_id: user.id,
+        token_hash: tokenHash,
+        device_info: input.deviceInfo || null,
+        ip_address: input.ipAddress,
+        user_agent: input.userAgent || null,
+        expires_at: expiresAt.toISOString(),
+      })
+      .select()
+      .single();
+
+    if (sessionError || !session) {
+      throw internalError('Failed to create session');
+    }
+
+    // Sign JWT
+    const token = await signAccessToken({
+      userId: user.id,
+      email: user.email,
+      roles,
+      sessionId: session.id,
+    });
+
+    // Reset failed attempts and update last login
+    await supabaseAdmin
       .from('users')
       .update({
-        failed_login_attempts: newFailedAttempts,
-        is_locked: shouldLock,
-        locked_until: lockedUntil,
+        failed_login_attempts: 0,
+        is_locked: false,
+        last_login_at: new Date().toISOString(),
       })
       .eq('id', user.id);
 
-    throw unauthorized('Invalid credentials');
+    // Log activity
+    await logActivity({
+      userId: user.id,
+      action: 'user_login',
+      ipAddress: input.ipAddress,
+      metadata: { sessionId: session.id },
+    });
+
+    return {
+      userId: user.id,
+      email: user.email,
+      token,
+      sessionId: session.id,
+    };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw internalError('Login failed');
   }
-
-  // Reset failed attempts and lock status
-  await client
-    .from('users')
-    .update({
-      failed_login_attempts: 0,
-      is_locked: false,
-      locked_until: null,
-      last_login_at: new Date().toISOString(),
-    })
-    .eq('id', user.id);
-
-  // Get user roles
-  const { data: userRoles } = await client
-    .from('user_roles')
-    .select('roles(name)')
-    .eq('user_id', user.id);
-
-  const roles = userRoles?.map((ur: any) => ur.roles?.name).filter(Boolean) || ['user'];
-
-  // Create session
-  const sessionToken = await crypto.getRandomValues(new Uint8Array(32));
-  const sessionTokenHex = Array.from(sessionToken)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-
-  const tokenHash = hashToken(sessionTokenHex);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
-
-  const { data: session, error: sessionError } = await client
-    .from('sessions')
-    .insert({
-      user_id: user.id,
-      token_hash: tokenHash,
-      ip_address: data.ipAddress,
-      user_agent: data.userAgent,
-      expires_at: expiresAt,
-      is_active: true,
-    })
-    .select('id')
-    .single();
-
-  if (sessionError || !session) {
-    throw internalError('Failed to create session');
-  }
-
-  // Sign JWT
-  const token = await signAccessToken({
-    userId: user.id,
-    email: user.email,
-    roles,
-    sessionId: session.id,
-  });
-
-  // Log activity
-  await logActivity(user.id, 'login', 'session');
-
-  // Get profile for full name
-  const { data: profile } = await client
-    .from('profiles')
-    .select('full_name')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  return {
-    userId: user.id,
-    email: user.email,
-    fullName: profile?.full_name,
-    token,
-    sessionId: session.id,
-  };
 }
 
-export async function logout(userId: string, sessionId: string): Promise<void> {
-  const client = getServiceClient();
+/**
+ * Logout: Revoke session
+ */
+export async function logout(userId: string, sessionId?: string): Promise<void> {
+  try {
+    if (sessionId) {
+      // Revoke specific session
+      await supabaseAdmin
+        .from('sessions')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('id', sessionId)
+        .eq('user_id', userId);
+    } else {
+      // Revoke all sessions
+      await supabaseAdmin
+        .from('sessions')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .is('revoked_at', null);
+    }
 
-  const { error } = await client
-    .from('sessions')
-    .update({ is_active: false })
-    .eq('id', sessionId)
-    .eq('user_id', userId);
-
-  if (error) {
+    // Log activity
+    await logActivity({
+      userId,
+      action: 'user_logout',
+      metadata: sessionId ? { sessionId } : { allSessions: true },
+    });
+  } catch (error) {
     console.error('Logout error:', error);
+    throw internalError('Logout failed');
   }
-
-  await logActivity(userId, 'logout', 'session');
 }
 
+/**
+ * Forgot Password: Generate reset token
+ */
+export async function forgotPassword(email: string): Promise<string> {
+  try {
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
+
+    if (!user) {
+      // Don't reveal if email exists - silent success for security
+      return 'password-reset-sent';
+    }
+
+    // Generate a secure reset token (using UUID is simpler than raw bytes)
+    const resetToken = crypto.randomUUID();
+    const tokenHash = await bcrypt.hash(resetToken, 10);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Store token in user metadata or a reset_tokens table
+    // For simplicity, storing in user metadata as JSON
+    await supabaseAdmin
+      .from('users')
+      .update({
+        metadata: {
+          reset_token: tokenHash,
+          reset_token_expires_at: expiresAt.toISOString(),
+        },
+      })
+      .eq('id', user.id);
+
+    // In production, send via Resend or similar
+    console.log(`Reset token for ${email}: ${resetToken}`);
+
+    return resetToken;
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    throw internalError('Failed to process password reset request');
+  }
+}
+
+/**
+ * Reset Password: Verify token and update password
+ */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  try {
+    // Find user by checking all for token match (this would need custom logic)
+    // For MVP, we'd typically store reset_tokens in a separate table
+    // For now, this is a simplified implementation
+    throw new AppError('Reset token validation not implemented', 400, 'NOT_IMPLEMENTED');
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw internalError('Password reset failed');
+  }
+}
+
+/**
+ * Change Password: Verify current password and update
+ */
 export async function changePassword(
   userId: string,
   currentPassword: string,
   newPassword: string
 ): Promise<void> {
-  const client = getServiceClient();
+  try {
+    // Fetch user
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('password_hash')
+      .eq('id', userId)
+      .single();
 
-  // Get current password hash
-  const { data: user, error: userError } = await client
-    .from('users')
-    .select('password_hash')
-    .eq('id', userId)
-    .single();
+    if (userError || !user) {
+      throw notFound('User');
+    }
 
-  if (userError || !user) {
-    throw notFound('User');
-  }
+    // Verify current password
+    const passwordValid = await bcrypt.compare(currentPassword, user.password_hash);
 
-  // Verify current password
-  if (!compareSync(currentPassword, user.password_hash || '')) {
-    throw unauthorized('Current password is incorrect');
-  }
+    if (!passwordValid) {
+      throw unauthorized('Current password is incorrect');
+    }
 
-  // Hash new password
-  const newPasswordHash = hashPassword(newPassword);
+    // Hash and update new password
+    const newPasswordHash = await bcrypt.hash(newPassword, env.BCRYPT_SALT_ROUNDS);
 
-  // Update password
-  const { error: updateError } = await client
-    .from('users')
-    .update({ password_hash: newPasswordHash })
-    .eq('id', userId);
+    await supabaseAdmin
+      .from('users')
+      .update({ password_hash: newPasswordHash })
+      .eq('id', userId);
 
-  if (updateError) {
-    throw internalError('Failed to update password');
-  }
-
-  // Invalidate all other sessions
-  await client
-    .from('sessions')
-    .update({ is_active: false })
-    .eq('user_id', userId);
-
-  await logActivity(userId, 'change_password', 'user');
-}
-
-export async function getSessions(userId: string): Promise<any[]> {
-  const client = getServiceClient();
-
-  const { data, error } = await client
-    .from('sessions')
-    .select('id, is_active, created_at, ip_address, user_agent')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw internalError('Failed to fetch sessions');
-  }
-
-  return data || [];
-}
-
-export async function revokeSessions(userId: string, sessionId?: string): Promise<void> {
-  const client = getServiceClient();
-
-  if (sessionId) {
-    const { error } = await client
+    // Revoke all sessions
+    await supabaseAdmin
       .from('sessions')
-      .update({ is_active: false })
-      .eq('id', sessionId)
-      .eq('user_id', userId);
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('revoked_at', null);
+
+    // Log activity
+    await logActivity({
+      userId,
+      action: 'password_changed',
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw internalError('Password change failed');
+  }
+}
+
+/**
+ * Get Sessions: Retrieve user's active sessions
+ */
+export async function getSessions(userId: string) {
+  try {
+    const { data: sessions, error } = await supabaseAdmin
+      .from('sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false });
 
     if (error) {
-      throw internalError('Failed to revoke session');
+      throw internalError('Failed to retrieve sessions');
     }
-  } else {
-    const { error } = await client
+
+    return sessions || [];
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw internalError('Failed to retrieve sessions');
+  }
+}
+
+/**
+ * Revoke Sessions: Revoke one or all sessions
+ */
+export async function revokeSessions(userId: string, sessionId?: string): Promise<void> {
+  try {
+    let query = supabaseAdmin
       .from('sessions')
-      .update({ is_active: false })
-      .eq('user_id', userId);
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('revoked_at', null);
+
+    if (sessionId) {
+      query = query.eq('id', sessionId);
+    }
+
+    const { error } = await query;
 
     if (error) {
       throw internalError('Failed to revoke sessions');
     }
+
+    await logActivity({
+      userId,
+      action: 'sessions_revoked',
+      metadata: sessionId ? { sessionId } : { allSessions: true },
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw internalError('Failed to revoke sessions');
+  }
+}
+
+/**
+ * Get current user with roles
+ */
+export async function getCurrentUser(userId: string) {
+  try {
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select(
+        `
+        id,
+        email,
+        is_verified,
+        is_locked,
+        last_login_at,
+        created_at,
+        updated_at,
+        profiles!inner (full_name, avatar_url, bio, website),
+        user_roles!inner (roles (name))
+      `
+      )
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      throw notFound('User');
+    }
+
+    return user;
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw internalError('Failed to fetch user');
   }
 }

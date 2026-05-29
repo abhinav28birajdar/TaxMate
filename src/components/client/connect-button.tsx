@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/SupabaseAuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Loader2, UserPlus, Check } from 'lucide-react';

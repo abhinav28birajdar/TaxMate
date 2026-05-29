@@ -3,7 +3,7 @@
  * Provides AI-powered recommendations for CAs and clients
  */
 
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 export interface AIRecommendation {
   id: string;
@@ -77,6 +77,7 @@ export class AIRecommendationService {
           confidenceScore: 0.85,
           expectedBenefit: '25-30% revenue increase',
           actionItems: ['Create service listing', 'Set pricing', 'Add to portfolio'],
+          dismissed: false,
         });
       }
 
@@ -91,6 +92,7 @@ export class AIRecommendationService {
           targetUserId: caProfile.user_id,
           confidenceScore: 0.9,
           expectedBenefit: 'Increase client retention',
+          dismissed: false,
         });
       }
 
@@ -129,6 +131,7 @@ export class AIRecommendationService {
             confidenceScore: 0.95,
             expectedBenefit: 'Legal compliance and tax efficiency',
             actionItems: ['Contact your CA', 'Gather GST details', 'Complete registration'],
+            dismissed: false,
           });
         }
 
@@ -143,6 +146,7 @@ export class AIRecommendationService {
             targetUserId: clientProfile.user_id,
             confidenceScore: 0.88,
             expectedBenefit: 'Ensure compliance and financial credibility',
+            dismissed: false,
           });
         }
       }
@@ -157,6 +161,7 @@ export class AIRecommendationService {
         targetUserId: clientProfile.user_id,
         confidenceScore: 0.92,
         expectedBenefit: 'Avoid late filing penalties',
+        dismissed: false,
       });
 
       return recommendations;
@@ -193,6 +198,7 @@ export class AIRecommendationService {
           confidenceScore: 0.8,
           expectedBenefit: '15-20% tax saving potential',
           actionItems: ['Review income sources', 'Identify eligible deductions', 'Plan investments'],
+          dismissed: false,
         });
       }
 
@@ -207,6 +213,7 @@ export class AIRecommendationService {
           targetUserId: clientProfile.user_id,
           confidenceScore: 0.85,
           expectedBenefit: '10-25% tax liability reduction',
+          dismissed: false,
         });
       }
 
@@ -260,6 +267,7 @@ export class AIRecommendationService {
           relatedEntityId: caseId,
           confidenceScore: 0.95,
           actionItems: [`Upload ${missing[0]}`, `Upload ${missing[1] || 'other documents'}`],
+          dismissed: false,
         });
       }
 
@@ -301,6 +309,7 @@ export class AIRecommendationService {
           relatedEntityId: caseId,
           confidenceScore: 1.0,
           actionItems: ['Review case status', 'Collect pending documents', 'Accelerate work'],
+          dismissed: false,
         });
       }
 
@@ -320,6 +329,7 @@ export class AIRecommendationService {
           relatedEntityId: caseId,
           confidenceScore: 0.8,
           actionItems: ['Schedule review meeting', 'Identify blockers', 'Create action plan'],
+          dismissed: false,
         });
       }
 

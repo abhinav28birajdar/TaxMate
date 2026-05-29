@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     const { email, password, name, phone, role, icaiNumber, companyName } = validation.data;
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
 
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Check if user already exists
     const existingUser = await supabase

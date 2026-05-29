@@ -10,7 +10,7 @@ import {
     Users,
     Settings,
     PhoneOff,
-    Record,
+    Disc,
     MoreVertical,
     Plus,
     Play,

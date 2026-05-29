@@ -71,7 +71,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { format, formatDistanceToNow, isPast, addDays } from 'date-fns';
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 

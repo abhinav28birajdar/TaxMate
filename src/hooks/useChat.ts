@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { Conversation, Message } from '@/types/database.types';
 import { RealtimeChannel } from '@supabase/supabase-js';
 

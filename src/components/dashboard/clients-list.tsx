@@ -1,6 +1,6 @@
 'use client';
 
-import { Client } from '@/lib/types/complete.types';
+import { Client } from '@lib/types/complete.types';
 
 interface ClientsListProps {
   clients: Client[];

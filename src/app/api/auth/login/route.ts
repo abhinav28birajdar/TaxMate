@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const { email, password, rememberMe } = validation.data;
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
 
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get user from database
     const { data: user, error: userError } = await supabase

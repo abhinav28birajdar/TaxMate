@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         ],
       },
       documents: {
-        pending: [
+        pendingDocuments: [
           { id: 'doc-001', name: 'Bank Statements - March 2024', dueDate: '2024-04-05', category: 'Bank Statements' },
           { id: 'doc-002', name: 'Expense Receipts', dueDate: '2024-04-10', category: 'Expense' },
           { id: 'doc-003', name: 'Invoice Register', dueDate: '2024-04-08', category: 'Invoices' },

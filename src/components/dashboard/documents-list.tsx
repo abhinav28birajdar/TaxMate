@@ -1,6 +1,6 @@
 'use client';
 
-import { Document } from '@/lib/types/complete.types';
+import { Document } from '@lib/types/complete.types';
 
 interface DocumentsListProps {
   documents: Document[];

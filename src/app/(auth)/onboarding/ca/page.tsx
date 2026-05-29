@@ -99,7 +99,7 @@ export default function CAOnboardingPage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            let result;
+            let result: { url: string; path?: string } | null = null;
             if (type === 'profile') {
                 result = await uploadFile(file, 'avatars', user.id);
                 setFormData(prev => ({ ...prev, profilePhotoUrl: result?.url || '' }));

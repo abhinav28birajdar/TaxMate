@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import Link from 'next/link';
 
 export default function TopBar() {

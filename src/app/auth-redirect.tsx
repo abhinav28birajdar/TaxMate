@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthHook';
+import { useAuth } from '@/hooks/AuthHook';
 
 export default function PageRedirect() {
   const { user, loading } = useAuth();

@@ -35,8 +35,13 @@ export async function PUT(request: NextRequest) {
         {
           user_id: auth.userId,
           theme: parsed.theme || 'system',
-          preferences: parsed.preferences || {},
-          notification_settings: parsed.notificationSettings || {},
+          language: parsed.language,
+          timezone: parsed.timezone,
+          notification_settings: {
+            email: parsed.emailNotifications,
+            push: parsed.pushNotifications,
+            marketing: parsed.marketingEmails,
+          },
         },
         { onConflict: 'user_id' }
       )

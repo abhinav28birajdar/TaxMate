@@ -17,8 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await documentService.getDocumentsByClient(clientId, {
-      category: category || undefined,
-      status: status || undefined,
+      type: category || undefined,
       skip,
       take,
     })

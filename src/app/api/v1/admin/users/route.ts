@@ -6,7 +6,7 @@ import { requireAuth, supabaseAdmin } from '@/lib/backend/supabase';
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.role, ['admin']);
+    ensureRole(auth.roles, ['admin']);
 
     const { data, error } = await supabaseAdmin
       .from('users')
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.role, ['admin']);
+    ensureRole(auth.roles, ['admin']);
 
     const body = await request.json();
     const userId = body.userId as string;

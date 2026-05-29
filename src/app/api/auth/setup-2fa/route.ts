@@ -4,7 +4,7 @@ import { setup2FA, createAuditLog } from '@/lib/auth-service';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get current user
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();

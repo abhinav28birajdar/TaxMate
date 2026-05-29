@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import Link from 'next/link';
 
 export default function BusinessDashboard() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   return (
@@ -25,7 +25,7 @@ export default function BusinessDashboard() {
                   <div className="flex items-center">
                     <div className="ml-3">
                       <div className="text-base font-medium text-gray-800 dark:text-gray-200">
-                        {profile?.businessName || profile?.displayName || user?.email?.split('@')[0]}
+                        {(user as any)?.name || user?.email?.split('@')[0]}
                       </div>
                       <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
                         {user?.email}
@@ -546,7 +546,7 @@ export default function BusinessDashboard() {
                               Company name
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:mt-0 sm:col-span-2">
-                              {profile?.businessName || 'Not set'}
+                              {(user as any)?.name || 'Not set'}
                             </dd>
                           </div>
                           <div className="bg-white dark:bg-gray-800 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -554,7 +554,7 @@ export default function BusinessDashboard() {
                               Business type
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:mt-0 sm:col-span-2">
-                              {profile?.businessType || 'Not set'}
+                              {'Business'}
                             </dd>
                           </div>
                           <div className="bg-gray-50 dark:bg-gray-700 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -641,7 +641,7 @@ export default function BusinessDashboard() {
                                       </div>
                                       <div className="ml-4">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                          {profile?.displayName || 'Admin User'}
+                                          {(user as any)?.name || 'Admin User'}
                                         </div>
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                           {user?.email}

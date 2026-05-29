@@ -3,7 +3,7 @@
  * Handles digital signature requests and verification
  */
 
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 export interface ESignatureRequest {
   id: string;

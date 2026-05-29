@@ -61,23 +61,23 @@ export function DashboardHeader() {
     };
 
     return (
-        <header className="h-16 border-b border-primary/10 bg-black/80 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-40">
+        <header className="h-16 border-b border-green-500/10 bg-black/80 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-40">
             <div className="flex items-center gap-4 lg:hidden">
-                <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10 hover:text-primary">
+                <Button variant="ghost" size="icon" className="text-green-400 hover:bg-green-500/10 hover:text-green-400">
                     <Menu className="w-5 h-5" />
                 </Button>
                 <span className="font-black uppercase tracking-tighter italic text-foreground">
-                    Tax<span className="text-primary">Mate</span>
+                    Fin<span className="text-green-400">Bank</span>
                 </span>
             </div>
 
             <div className="hidden lg:flex flex-1 max-w-xl">
                 <div className="relative w-full group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-green-400 transition-colors" />
                     <Input
                         type="search"
                         placeholder="SEARCH COMMANDS..."
-                        className="w-full bg-white/5 border-primary/10 focus:border-primary/50 pl-10 h-10 rounded-none text-[10px] font-bold uppercase tracking-widest placeholder:text-muted-foreground/30 transition-all shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]"
+                        className="w-full bg-white/5 border-green-500/10 focus:border-green-500/50 pl-10 h-10 rounded-none text-[10px] font-bold uppercase tracking-widest placeholder:text-muted-foreground/30 transition-all shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]"
                     />
                 </div>
             </div>
@@ -85,16 +85,16 @@ export function DashboardHeader() {
             <div className="flex items-center gap-4">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="relative group/notif rounded-none hover:bg-primary/10 transition-colors">
-                            <Bell className="w-4 h-4 text-muted-foreground group-hover/notif:text-primary group-hover/notif:animate-bounce transition-colors" />
+                        <Button variant="ghost" size="icon" className="relative group/notif rounded-none hover:bg-green-500/10 transition-colors">
+                            <Bell className="w-4 h-4 text-muted-foreground group-hover/notif:text-green-400 group-hover/notif:animate-bounce transition-colors" />
                             {notifications.length > 0 && (
-                                <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+                                <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
                             )}
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-80 bg-black border-primary/20 rounded-none shadow-[0_0_30px_rgba(34,197,94,0.1)]">
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.3em] font-black text-primary p-4 pb-2">Sync Alerts</DropdownMenuLabel>
-                        <DropdownMenuSeparator className="bg-primary/10 mx-2" />
+                    <DropdownMenuContent align="end" className="w-80 bg-black border-green-500/20 rounded-none shadow-[0_0_30px_rgba(34,197,94,0.1)]">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.3em] font-black text-green-400 p-4 pb-2">Sync Alerts</DropdownMenuLabel>
+                        <DropdownMenuSeparator className="bg-green-500/10 mx-2" />
                         <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                             {notifications.length === 0 ? (
                                 <div className="p-8 text-[10px] text-muted-foreground text-center font-bold uppercase tracking-widest italic">All systems clear</div>

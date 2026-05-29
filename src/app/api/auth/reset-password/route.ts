@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { token, password } = validation.data;
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Find reset token
     const { data: tokenData, error: tokenError } = await supabase

@@ -17,7 +17,7 @@ export default function AuthGuard({
   requiredRole = 'any',
   redirectTo = '/login'
 }: AuthGuardProps) {
-  const { user, profile, loading } = useAuth();
+  const { user, isLoading: loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -29,29 +29,32 @@ export default function AuthGuard({
       }
       
       // If role check is required
-      if (requiredRole !== 'any' && profile?.role !== requiredRole) {
-        // Redirect to appropriate dashboard based on role
-        if (profile?.role) {
-          switch (profile.role) {
-            case 'customer':
-              router.push('/dashboard/customer');
-              break;
-            case 'ca':
-              router.push('/dashboard/ca');
-              break;
-            case 'business':
-              router.push('/dashboard/business');
-              break;
-            default:
-              router.push(redirectTo);
+      if (requiredRole !== 'any') {
+        const userRole = user?.role as string;
+        if (userRole !== requiredRole) {
+          // Redirect to appropriate dashboard based on role
+          if (userRole) {
+            switch (userRole) {
+              case 'customer':
+                router.push('/dashboard/customer');
+                break;
+              case 'ca':
+                router.push('/dashboard/ca');
+                break;
+              case 'business':
+                router.push('/dashboard/business');
+                break;
+              default:
+                router.push(redirectTo);
+            }
+          } else {
+            // If no role is set, redirect to login
+            router.push(redirectTo);
           }
-        } else {
-          // If no role is set, redirect to login
-          router.push(redirectTo);
         }
       }
     }
-  }, [user, profile, loading, router, requiredRole, redirectTo]);
+  }, [user, loading, router, requiredRole, redirectTo]);
 
   // Show loading indicator while checking auth
   if (loading) {
@@ -63,7 +66,7 @@ export default function AuthGuard({
   }
 
   // If auth check passed, render children
-  if (!loading && user && (requiredRole === 'any' || profile?.role === requiredRole)) {
+  if (!loading && user && (requiredRole === 'any' || (user?.role as string) === requiredRole)) {
     return <>{children}</>;
   }
 

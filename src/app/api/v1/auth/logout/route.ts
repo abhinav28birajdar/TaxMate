@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { errorResponse, successResponse } from '@/lib/backend/response';
 import { authGuard } from '@/lib/backend/supabase';
-import { logout } from '@/lib/backend/auth-service-new';
+import { logout } from '@/lib/backend/auth-service';
 import { logActivity } from '@/lib/backend/audit';
 import { getIpAddress } from '@/lib/utils';
 
@@ -13,9 +13,6 @@ export async function POST(request: NextRequest) {
 
     // Logout user
     await logout(user.userId, user.sessionId);
-
-    // Log activity
-    await logActivity(user.userId, 'logout', 'session', undefined, {}, ip);
 
     return successResponse(
       { message: 'Logout successful' },

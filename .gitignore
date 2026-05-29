@@ -86,3 +86,16 @@ build/
 # Local development
 .tmp
 tmp/
+
+# Generated project docs
+AUTH_SYSTEM_COMPLETE.md
+BUILD_RESOLUTION_SUMMARY.md
+DEPLOYMENT_READY.md
+ENV_CONFIGURATION_GUIDE.md
+IMPLEMENTATION_SUMMARY.md
+MVP_DEPLOYMENT_GUIDE.md
+SITE_MAP.md
+VERCEL_DEPLOYMENT_GUIDE.md
+
+# Local backup files
+*.backup

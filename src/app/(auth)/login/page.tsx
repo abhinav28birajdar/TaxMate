@@ -10,18 +10,47 @@ import { toast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { createClient } from '@/utils/supabase/client';
+import { loginSchema } from '@/lib/validators-unified';
+import type { LoginInput } from '@/lib/validators-unified';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof LoginInput, string>>>({});
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
 
+  const validateForm = () => {
+    setErrors({});
+    const result = loginSchema.safeParse(formData);
+    
+    if (!result.success) {
+      const formErrors: typeof errors = {};
+      result.error.issues.forEach(issue => {
+        const field = issue.path[0] as keyof LoginInput;
+        formErrors[field] = issue.message;
+      });
+      setErrors(formErrors);
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast({
+        title: "Validation Error",
+        description: "Please check the form for errors",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -106,7 +135,9 @@ export default function LoginPage() {
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className={errors.email ? 'border-red-500' : ''}
             />
+            {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -121,7 +152,9 @@ export default function LoginPage() {
               required
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className={errors.password ? 'border-red-500' : ''}
             />
+            {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>

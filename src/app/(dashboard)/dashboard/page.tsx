@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { cn } from '@/lib/utils';
 import { startOfMonth } from 'date-fns';
 
@@ -159,7 +159,7 @@ function StatsCard({
 }
 
 export default function DashboardPage() {
-  const { user, profile, role } = useAuth();
+  const { user, role } = useAuth();
   const router = useRouter();
   const supabase = createClient();
 
@@ -187,7 +187,7 @@ export default function DashboardPage() {
       const now = new Date();
       const thisMonthStart = startOfMonth(now);
 
-      if (role === 'ca') {
+      if (role === 'CA') {
         const { data: caProfile } = await supabase
           .from('ca_profiles')
           .select('id')
@@ -230,7 +230,7 @@ export default function DashboardPage() {
               status: c.status,
               priority: c.priority,
               client_name: c.client ? `${c.client.first_name} ${c.client.last_name}` : 'Unknown',
-              client_avatar: c.client?.avatar_url,
+              client_avatar: c.client?.avatar_url || null,
               created_at: c.created_at,
               due_date: c.due_date,
             }))
@@ -260,33 +260,48 @@ export default function DashboardPage() {
           .eq('client_id', clientProfile.id)
           .in('status', ['new', 'in_progress', 'pending_review']);
 
+        // Fetch real pending tasks for client
+        const { count: pendingTasksCount } = await supabase
+          .from('tasks')
+          .select('*', { count: 'exact', head: true })
+          .eq('assigned_to', user.id)
+          .in('status', ['TODO', 'IN_PROGRESS']);
+
+        // Fetch real invoices for client (amount due)
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('total_amount, status')
+          .eq('client_id', clientProfile.id)
+          .in('status', ['SENT', 'PARTIALLY_PAID', 'OVERDUE']);
+
+        const amountDue = invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
+
         setStats(prev => ({
           ...prev,
           activeCases: activeCasesCount || 0,
-          totalRevenue: 5400, // Mock for client
-          pendingTasks: 3, // Mock
+          totalRevenue: amountDue,
+          pendingTasks: pendingTasksCount || 0,
         }));
       }
 
-      setRefunds([
-        {
-          id: '1',
-          assessment_year: '2024-25',
-          status: 'processed',
-          refund_amount: 15420,
-          filing_date: '2024-05-15',
-          bank_account_last4: '4521'
-        },
-        {
-          id: '2',
-          assessment_year: '2023-24',
-          status: 'refund_credited',
-          refund_amount: 8750,
-          filing_date: '2023-06-10',
-          credited_date: '2023-08-22',
-          bank_account_last4: '4521'
+      // Fetch real tax refunds/filings
+      try {
+        const { data: taxFilings } = await supabase
+          .from('tax_filings')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('assessment_year', { ascending: false })
+          .limit(5);
+
+        if (taxFilings && taxFilings.length > 0) {
+          setRefunds(taxFilings as TaxRefund[]);
+        } else {
+          setRefunds([]);
         }
-      ]);
+      } catch (error) {
+        console.error('Error fetching refunds:', error);
+        setRefunds([]);
+      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -301,8 +316,8 @@ export default function DashboardPage() {
     }
   }, [user, fetchDashboardData]);
 
-  const displayName = profile
-    ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'there'
+  const displayName = user
+    ? `${user.name || ''}`.trim() || 'there'
     : 'there';
 
   return (
@@ -324,7 +339,7 @@ export default function DashboardPage() {
             <FileText className="mr-2 h-4 w-4 text-primary" />
             Export Logs
           </Button>
-          {role === 'ca' && (
+          {role === 'CA' && (
             <Button size="lg" className="h-12 bg-primary text-black hover:bg-primary/90 rounded-none font-black uppercase tracking-widest text-[10px] shadow-[0_0_20px_rgba(34,197,94,0.3)]" onClick={() => router.push('/cases')}>
               <Plus className="mr-2 h-4 w-4" />
               Initialize Case
@@ -335,7 +350,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
-          title={role === 'ca' ? 'Monthly Revenue' : 'Amount Due'}
+          title={role === 'CA' ? 'Monthly Revenue' : 'Amount Due'}
           value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`}
           icon={IndianRupee}
           loading={loading}
@@ -351,9 +366,9 @@ export default function DashboardPage() {
           changeLabel="case velocity"
         />
         <StatsCard
-          title={role === 'ca' ? 'Total Clients' : 'Appointments'}
-          value={role === 'ca' ? stats.totalClients : 0}
-          icon={role === 'ca' ? Users : Calendar}
+          title={role === 'CA' ? 'Total Clients' : 'Appointments'}
+          value={role === 'CA' ? stats.totalClients : 0}
+          icon={role === 'CA' ? Users : Calendar}
           loading={loading}
           change={5.1}
           changeLabel="network growth"
@@ -380,7 +395,7 @@ export default function DashboardPage() {
 
         <TabsContent value="overview" className="space-y-8 mt-0 outline-none">
           <div className="grid gap-6 lg:grid-cols-7">
-            <Card className={cn("bg-zinc-950/40 border-primary/10 rounded-none relative overflow-hidden", role === 'ca' ? 'col-span-4' : 'col-span-7')}>
+            <Card className={cn("bg-zinc-950/40 border-primary/10 rounded-none relative overflow-hidden", role === 'CA' ? 'col-span-4' : 'col-span-7')}>
               <CardHeader className="flex flex-row items-center justify-between border-b border-primary/5 pb-4">
                 <div>
                   <CardTitle className="text-sm font-black uppercase tracking-[0.2em] italic">Active Protocols</CardTitle>
@@ -456,7 +471,7 @@ export default function DashboardPage() {
               <CyberCorner position="bottom-right" />
             </Card>
 
-            {role === 'ca' && (
+            {role === 'CA' && (
               <Card className="col-span-3 bg-zinc-950/40 border-primary/10 rounded-none relative overflow-hidden flex flex-col">
                 <CardHeader className="border-b border-primary/5">
                   <CardTitle className="text-sm font-black uppercase tracking-[0.2em] italic">Sync Schedule</CardTitle>

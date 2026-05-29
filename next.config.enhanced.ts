@@ -101,6 +101,8 @@ const nextConfig: NextConfig = {
           destination: '/api/:path*',
         },
       ],
+      afterFiles: [],
+      fallback: [],
     };
   },
 
@@ -115,7 +117,6 @@ const nextConfig: NextConfig = {
   // Experimental features
   experimental: {
     optimizePackageImports: ['@/components', '@/lib'],
-    optimizeServerBundle: true,
   },
 
   // Performance optimizations

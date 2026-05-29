@@ -133,8 +133,8 @@ export default function BusinessIntelligencePage() {
                     pred.status === 'up'
                       ? 'success'
                       : pred.status === 'opportunity'
-                      ? 'default'
-                      : 'default'
+                      ? 'info'
+                      : 'neutral'
                   }
                 >
                   {pred.status === 'up' ? '↑ Growing' : pred.status === 'opportunity' ? '💡 Opportunity' : '→ Stable'}

@@ -6,7 +6,7 @@ import { ensureRole } from '@/lib/backend/rbac';
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.role, ['admin', 'moderator']);
+    ensureRole(auth.roles, ['admin', 'moderator']);
 
     const userId = request.nextUrl.searchParams.get('userId');
     let query = supabaseAdmin

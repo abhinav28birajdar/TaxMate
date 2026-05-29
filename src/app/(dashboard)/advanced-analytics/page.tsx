@@ -80,7 +80,7 @@ export default function AdvancedAnalyticsPage() {
             <div className="mb-3">
               <p className="text-2xl font-bold text-slate-900">{pred.value}</p>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant={pred.trend === 'up' ? 'success' : 'default'}>
+                <Badge variant={pred.trend === 'up' ? 'success' : pred.trend === 'down' ? 'danger' : 'neutral'}>
                   {pred.trend === 'up' ? '↑ Up' : pred.trend === 'down' ? '↓ Down' : '→ Stable'}
                 </Badge>
                 <span className="text-xs text-slate-500">{pred.confidence} confidence</span>
@@ -178,7 +178,7 @@ export default function AdvancedAnalyticsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Potential Churn:</span>
-                  <Badge variant={tier.churn > 10 ? 'alert' : 'default'}>{tier.churn} clients</Badge>
+                  <Badge variant={tier.churn > 10 ? 'danger' : 'neutral'}>{tier.churn} clients</Badge>
                 </div>
               </div>
             </div>

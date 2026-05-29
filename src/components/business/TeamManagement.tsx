@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { useRouter } from 'next/navigation';
 
 // Team member management components
 export default function TeamManagement() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
@@ -16,7 +16,7 @@ export default function TeamManagement() {
   const [teamMembers, setTeamMembers] = useState([
     {
       id: '1',
-      name: profile?.displayName || 'Admin User',
+      name: (user as any)?.name || 'Admin User',
       email: user?.email || '',
       role: 'admin',
       status: 'active',

@@ -125,3 +125,38 @@ export async function validateBody<T extends z.ZodSchema>(schema: T, request: Re
     throw validationError({ error: 'Invalid request body' });
   }
 }
+
+// Aliases for API endpoint schemas
+export const onboardingSchema = z.object({
+  step: z.number().int().min(1).optional(),
+  basicInfo: z.record(z.unknown()).optional(),
+  preferences: z.record(z.unknown()).optional(),
+  interests: z.array(z.string()).optional(),
+  completed: z.boolean().optional(),
+});
+
+export const profileSchema = z.object({
+  fullName: z.string().optional(),
+  bio: z.string().optional(),
+  website: z.string().url().optional().nullable(),
+  twitter: z.string().optional().nullable(),
+  linkedin: z.string().optional().nullable(),
+  github: z.string().optional().nullable(),
+  isPublic: z.boolean().optional(),
+});
+
+export const settingsSchema = z.object({
+  theme: z.enum(['light', 'dark', 'system']).optional(),
+  language: z.string().optional(),
+  timezone: z.string().optional(),
+  emailNotifications: z.boolean().optional(),
+  pushNotifications: z.boolean().optional(),
+  marketingEmails: z.boolean().optional(),
+});
+
+export const supportTicketSchema = z.object({
+  subject: z.string().min(5, 'Subject must be at least 5 characters'),
+  body: z.string().min(10, 'Body must be at least 10 characters'),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  category: z.string().optional(),
+});

@@ -58,10 +58,20 @@ export async function requireRole(userId: string, ...roleNames: string[]): Promi
 }
 
 export async function requirePermission(userId: string, resource: string, action: string): Promise<void> {
-  const hasPermission = await hasPermission(userId, resource, action);
+  const hasPerms = await hasPermission(userId, resource, action);
 
-  if (!hasPermission) {
-    throw forbidden(`Missing permission: ${resource}:${action}`);
+  if (!hasPerms) {
+    throw forbidden(`Requires permission: ${resource}:${action}`);
+  }
+}
+
+// Helper function for checking roles synchronously in API routes
+export function ensureRole(userRole: string | string[], allowedRoles: string[]): void {
+  const roles = Array.isArray(userRole) ? userRole : [userRole];
+  const hasRequiredRole = roles.some((role) => allowedRoles.includes(role));
+
+  if (!hasRequiredRole) {
+    throw forbidden(`Requires one of these roles: ${allowedRoles.join(', ')}`);
   }
 }
 

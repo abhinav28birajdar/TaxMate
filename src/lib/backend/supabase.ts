@@ -39,7 +39,7 @@ export async function authGuard(request: Request): Promise<JWTPayload> {
     const client = getServiceClient();
     const { data: session, error } = await client
       .from('sessions')
-      .select('id, is_active, expires_at')
+      .select('id, revoked_at, expires_at')
       .eq('id', payload.sessionId)
       .eq('user_id', payload.userId)
       .single();
@@ -48,8 +48,8 @@ export async function authGuard(request: Request): Promise<JWTPayload> {
       throw unauthorized('Session not found');
     }
 
-    if (!session.is_active) {
-      throw unauthorized('Session is inactive');
+    if (session.revoked_at) {
+      throw unauthorized('Session has been revoked');
     }
 
     if (new Date(session.expires_at).getTime() < Date.now()) {
@@ -68,3 +68,7 @@ export async function authGuard(request: Request): Promise<JWTPayload> {
 export async function getUserFromRequest(request: Request): Promise<JWTPayload> {
   return authGuard(request);
 }
+
+// Aliases for API endpoints
+export const requireAuth = authGuard;
+export const supabaseAdmin = getServiceClient();

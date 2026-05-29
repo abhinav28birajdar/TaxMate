@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { fail, ok } from '@/lib/backend/response';
 import { profileSchema } from '@/lib/backend/validation';
 import { requireAuth, supabaseAdmin } from '@/lib/backend/supabase';
-import { writeActivityLog } from '@/lib/backend/audit';
+import { logActivity } from '@/lib/backend/audit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,16 +40,18 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const parsed = profileSchema.parse(body);
 
-    if (parsed.name) {
-      await supabaseAdmin.from('users').update({ name: parsed.name }).eq('id', auth.userId);
+    if (parsed.fullName) {
+      await supabaseAdmin.from('users').update({ name: parsed.fullName }).eq('id', auth.userId);
     }
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .update({
         bio: parsed.bio,
-        avatar_url: parsed.profileImageUrl,
-        social_links: parsed.socialLinks,
+        website: parsed.website,
+        twitter: parsed.twitter,
+        linkedin: parsed.linkedin,
+        github: parsed.github,
         is_public: parsed.isPublic,
       })
       .eq('user_id', auth.userId)
@@ -60,10 +62,11 @@ export async function PATCH(request: NextRequest) {
       throw error;
     }
 
-    await writeActivityLog({
+    await logActivity({
       userId: auth.userId,
-      action: 'Profile updated',
-      category: 'profile',
+      action: 'profile_updated',
+      resourceType: 'profile',
+      resourceId: auth.userId,
     });
 
     return ok({ profile: data }, 'Profile updated');

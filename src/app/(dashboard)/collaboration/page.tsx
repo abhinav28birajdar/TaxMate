@@ -114,7 +114,7 @@ export default function RealtimeCollaborationPage() {
                     <p className="text-xs text-slate-600">{user.role} • {user.location}</p>
                   </div>
                 </div>
-                <Badge variant={user.status === 'online' ? 'success' : 'default'}>
+                <Badge variant={user.status === 'online' ? 'success' : 'neutral'}>
                   {user.status === 'online' ? '🟢 Online' : '🟡 Away'}
                 </Badge>
               </div>
@@ -144,7 +144,7 @@ export default function RealtimeCollaborationPage() {
                 <Badge
                   variant={
                     project.status === 'in_progress'
-                      ? 'default'
+                      ? 'warning'
                       : 'success'
                   }
                 >

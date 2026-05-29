@@ -1,4 +1,4 @@
-import { Database } from '@/lib/types/database.types';
+import { Database } from '@lib/types/database.types';
 
 export type UserRole = Database['public']['Enums']['user_role'] | 'any';
 

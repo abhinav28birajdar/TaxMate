@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { email } = validation.data;
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get user
     const { data: user, error: userError } = await supabase

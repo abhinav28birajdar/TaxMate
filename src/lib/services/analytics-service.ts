@@ -3,7 +3,7 @@
  * Provides comprehensive analytics for CAs and their cases
  */
 
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 export interface CaseMetrics {
   caseId: string;
@@ -205,7 +205,7 @@ export class AnalyticsService {
 
     if (error) throw error;
 
-    const dailyRevenue = data?.reduce((acc, invoice) => {
+    const dailyRevenue = data?.reduce((acc: Record<string, number>, invoice) => {
       const date = invoice.issue_date;
       if (!acc[date]) {
         acc[date] = 0;
@@ -239,7 +239,7 @@ export class AnalyticsService {
 
     if (error) throw error;
 
-    const trends = data?.reduce((acc, caseData) => {
+    const trends = data?.reduce((acc: Record<string, { created: number; completed: number }>, caseData) => {
       const month = new Date(caseData.created_at).toLocaleString('default', { month: 'short', year: 'numeric' });
       if (!acc[month]) {
         acc[month] = { created: 0, completed: 0 };
@@ -265,7 +265,7 @@ export class AnalyticsService {
 
     if (error) throw error;
 
-    const distribution = data?.reduce((acc, caseData) => {
+    const distribution = data?.reduce((acc: Record<string, number>, caseData) => {
       if (!acc[caseData.status]) {
         acc[caseData.status] = 0;
       }
@@ -292,7 +292,7 @@ export class AnalyticsService {
 
     if (error) throw error;
 
-    const trends = data?.reduce((acc, rel) => {
+    const trends = data?.reduce((acc: Record<string, number>, rel) => {
       const month = new Date(rel.connected_at).toLocaleString('default', { month: 'short', year: 'numeric' });
       if (!acc[month]) {
         acc[month] = 0;
@@ -316,15 +316,15 @@ export class AnalyticsService {
         .single();
 
       if (caProfile) {
-        const performance = await this.getCAPerformance(caProfile.id);
-        const cases = await this.supabase
+      const performance = await this.getCAPerformance(caProfile.id);
+        const { data: cases, error: casesError } = await this.supabase
           .from('cases')
           .select('*', { count: 'exact' })
           .eq('ca_id', caProfile.id);
 
         return {
           ...performance,
-          totalCases: cases?.length,
+          totalCases: cases?.length || 0,
           lastUpdated: new Date().toISOString(),
         };
       }

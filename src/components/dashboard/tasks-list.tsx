@@ -1,6 +1,6 @@
 'use client';
 
-import { Task } from '@/lib/types/complete.types';
+import { Task } from '@lib/types/complete.types';
 
 interface TasksListProps {
   tasks: Task[];
@@ -70,7 +70,7 @@ export default function TasksList({ tasks, loading }: TasksListProps) {
               </td>
               <td className="px-6 py-4">
                 <span className="text-sm text-gray-600">
-                  {new Date(task.deadline).toLocaleDateString()}
+                  {task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}
                 </span>
               </td>
               <td className="px-6 py-4">

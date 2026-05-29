@@ -3,7 +3,7 @@
  * Manages tax form templates, client forms, and form completion tracking
  */
 
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 export interface TaxFormTemplate {
   id: string;
@@ -19,15 +19,15 @@ export interface TaxFormTemplate {
 
 export interface ClientTaxForm {
   id: string;
-  clientId: string;
-  templateId: string;
+  client_id: string;
+  template_id: string;
   formCode: string;
   formName: string;
-  financialYear: string;
-  formData: Record<string, any>;
+  financial_year: string;
+  form_data: Record<string, any>;
   status: 'draft' | 'in_progress' | 'review' | 'submitted';
-  completionPercentage: number;
-  missingFields: string[];
+  completion_percentage: number;
+  missing_fields: string[];
   submittedAt?: string;
 }
 
@@ -281,7 +281,7 @@ export class TaxFormService {
     const { data: documents } = await this.supabase
       .from('documents')
       .select('category')
-      .eq('case_id', form.case_id);
+      .eq('case_id', formId);
 
     const uploadedCategories = documents?.map(d => d.category) || [];
     const requiredCategories = template.requiredDocuments || [];
@@ -301,7 +301,7 @@ export class TaxFormService {
     const form = await this.getClientTaxForm(formId);
 
     if (form.completion_percentage < 100) {
-      throw new Error('Form is not 100% complete. Missing fields: ' + form.missingFields.join(', '));
+      throw new Error('Form is not 100% complete. Missing fields: ' + form.missing_fields.join(', '));
     }
 
     const docStatus = await this.checkFormDocumentsStatus(formId);

@@ -140,7 +140,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 // GET /api/compliance/dashboard - Get compliance dashboard
-export async function getComplianceDashboard(caId: string) {
+async function getComplianceDashboard(caId: string) {
   try {
     const { data: items } = await supabase
       .from('compliance_items')

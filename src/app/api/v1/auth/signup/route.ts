@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { signupSchema, validateBody } from '@/lib/backend/validation';
 import { errorResponse, successResponse } from '@/lib/backend/response';
-import { signup } from '@/lib/backend/auth-service-new';
+import { signup } from '@/lib/backend/auth-service';
 import { rateLimitPresets } from '@/lib/backend/rate-limit';
 import { getIpAddress } from '@/lib/utils';
 

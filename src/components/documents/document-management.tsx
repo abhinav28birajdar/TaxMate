@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { documentService } from '@/src/lib/services';
-import { Document } from '@/lib/types/complete.types';
+import { documentService } from '@/lib/services';
+import { Document } from '@lib/types/complete.types';
 import {
   Card,
   Button,
@@ -10,8 +10,8 @@ import {
   LoadingSpinner,
   DataTable,
   ProgressBar,
-} from '@/src/components/ui/core-components';
-import { colors } from '@/src/theme/design-system';
+} from '@/components/ui/core-components';
+import { colors } from '@/theme/design-system';
 
 // ============================================================================
 // DOCUMENT MANAGEMENT COMPONENT
@@ -59,7 +59,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ clientId
       setDocuments(response.data);
 
       // Calculate storage used
-      const totalSize = response.data.reduce((sum, doc) => sum + (doc.file_size || 0), 0);
+      const totalSize = (response.data || []).reduce((sum: number, doc: any) => sum + (doc.file_size || 0), 0);
       setStorageUsed(totalSize);
     } catch (error) {
       console.error('Failed to load documents:', error);

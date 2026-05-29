@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { taskService } from '@/lib/task-service'
+import { taskService } from '@/lib/services'
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,19 +7,18 @@ export async function GET(request: NextRequest) {
     const clientId = request.headers.get('x-client-id')
     const status = request.nextUrl.searchParams.get('status')
     const priority = request.nextUrl.searchParams.get('priority')
-    const skip = parseInt(request.nextUrl.searchParams.get('skip') || '0')
-    const take = parseInt(request.nextUrl.searchParams.get('take') || '20')
 
-    const result = await taskService.getTasks({
-      caId: caId || undefined,
-      clientId: clientId || undefined,
+    // Get tasks using the Supabase-based service
+    const tasks = await taskService.getAll(caId || clientId || '', {
       status: status || undefined,
       priority: priority || undefined,
-      skip,
-      take,
     })
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      tasks,
+      total: tasks?.length || 0,
+      success: true,
+    })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message },
@@ -31,18 +30,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const caId = request.headers.get('x-ca-id')
-    if (!caId) {
+    const clientId = request.headers.get('x-client-id')
+    
+    if (!caId && !clientId) {
       return NextResponse.json(
-        { error: 'CA ID required' },
+        { error: 'CA ID or Client ID required' },
         { status: 401 }
       )
     }
 
     const body = await request.json()
-    const task = await taskService.createTask({
-      caId,
-      ...body,
-    })
+    const task = await taskService.create(
+      caId || clientId || '',
+      clientId || caId || '',
+      body
+    )
 
     return NextResponse.json(
       { success: true, task },

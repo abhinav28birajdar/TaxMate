@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const parsed = resetPasswordSchema.parse(body);
 
-    await resetPassword(parsed.token, parsed.newPassword);
+    await resetPassword(parsed.token, parsed.password);
 
     return ok({}, 'Password reset successful');
   } catch (error) {

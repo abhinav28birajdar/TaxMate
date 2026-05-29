@@ -1,3 +1,7 @@
+// Firebase client app - Currently not used, using Supabase instead
+// Keeping file for reference but disabling imports to avoid build errors
+
+/*
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
 import { 
@@ -92,3 +96,6 @@ export {
   analytics,
   performance 
 };
+*/
+
+// Placeholder exports for backward compatibility (nothing exported, using Supabase instead)

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useChat, Chat } from '@/context/ChatContext';
+import { useChatContext, Chat } from '@/hooks/ChatContext';
 import { formatDistanceToNow } from 'date-fns';
 
 const ChatItem = ({ chat, active, onClick }: { chat: Chat; active: boolean; onClick: () => void }) => {
@@ -73,7 +73,7 @@ const ChatItem = ({ chat, active, onClick }: { chat: Chat; active: boolean; onCl
 };
 
 export default function ChatList() {
-    const { chats, activeChat, setActiveChat } = useChat();
+    const { chats, activeChat, setActiveChat } = useChatContext();
     const [searchQuery, setSearchQuery] = useState('');
 
     const filteredChats = chats.filter(chat =>

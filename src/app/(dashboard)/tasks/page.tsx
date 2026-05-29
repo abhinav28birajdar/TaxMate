@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/hooks/UnifiedAuthContext'
+import { useRealtimeTasks } from '@/hooks/use-realtime'
+import { Loader, TableSkeleton } from '@/lib/loading-states'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 export default function TasksPage() {
   const { user } = useAuth()
@@ -10,27 +13,53 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
+  const [error, setError] = useState<string | null>(null)
 
+  // Fetch initial tasks data
   useEffect(() => {
     const loadTasks = async () => {
+      if (!user?.id) return
       try {
+        setLoading(true)
         const res = await fetch(
           `/api/tasks?status=${statusFilter === 'all' ? '' : statusFilter}&priority=${priorityFilter === 'all' ? '' : priorityFilter}`,
           { headers: { 'x-ca-id': user?.id || '' } }
         )
+        if (!res.ok) throw new Error('Failed to fetch tasks')
         const data = await res.json()
         setTasks(data.tasks || [])
+        setError(null)
       } catch (error) {
         console.error('Failed to load tasks:', error)
+        setError('Failed to load tasks. Please try again.')
+        toast.error('Failed to load tasks')
       } finally {
         setLoading(false)
       }
     }
 
-    if (user?.id) {
-      loadTasks()
-    }
+    loadTasks()
   }, [user?.id, statusFilter, priorityFilter])
+
+  // Real-time subscriptions - listen for task changes
+  useRealtimeTasks(
+    user?.id || '',
+    useCallback((newTask) => {
+      // New task inserted
+      setTasks(prev => [newTask, ...prev])
+      toast.success('New task added')
+    }, []),
+    useCallback((updatedTask) => {
+      // Task updated
+      setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t))
+      toast.success('Task updated')
+    }, []),
+    useCallback((deletedTask) => {
+      // Task deleted
+      setTasks(prev => prev.filter(t => t.id !== deletedTask.id))
+      toast.success('Task deleted')
+    }, [])
+  )
 
   const statusColors: any = {
     TODO: 'bg-gray-100 text-gray-800',
@@ -44,6 +73,13 @@ export default function TasksPage() {
     MEDIUM: 'text-orange-500',
     HIGH: 'text-red-500',
   }
+
+  // Filter tasks based on current filters
+  const filteredTasks = tasks.filter(task => {
+    if (statusFilter !== 'all' && task.status !== statusFilter) return false
+    if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false
+    return true
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -94,18 +130,23 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Tasks List */}
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 text-red-700">
+            {error}
           </div>
-        ) : tasks.length === 0 ? (
+        )}
+
+        {/* Loading State */}
+        {loading ? (
+          <TableSkeleton rows={5} columns={3} />
+        ) : filteredTasks.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center border border-gray-200">
             <p className="text-gray-600 text-lg">No tasks found</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {tasks.map((task: any) => (
+            {filteredTasks.map((task: any) => (
               <div
                 key={task.id}
                 className="bg-white rounded-2xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-all"
@@ -135,9 +176,11 @@ export default function TasksPage() {
                       )}
                     </div>
                   </div>
-                  <button className="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium">
-                    View
-                  </button>
+                  <Link href={`/dashboard/tasks/${task.id}`}>
+                    <button className="px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium">
+                      View
+                    </button>
+                  </Link>
                 </div>
               </div>
             ))}

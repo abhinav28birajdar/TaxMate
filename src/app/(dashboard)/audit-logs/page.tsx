@@ -158,7 +158,7 @@ export default function AuditLogsPage() {
                     <span className="text-slate-600 text-xs">{log.resource}</span>
                   </td>
                   <td className="py-3 px-3">
-                    <Badge variant={log.status === 'success' ? 'success' : 'alert'}>
+                    <Badge variant={log.status === 'success' ? 'success' : 'danger'}>
                       {log.status === 'success' ? '✓ Success' : '✗ Failed'}
                     </Badge>
                   </td>

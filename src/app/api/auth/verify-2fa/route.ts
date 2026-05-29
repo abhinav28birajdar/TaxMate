@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { token } = validation.data;
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Get current user
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();

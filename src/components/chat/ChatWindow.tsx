@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { useChat, Message } from '@/context/ChatContext';
+import { useChatContext, Message } from '@/hooks/ChatContext';
 import { format, isValid } from 'date-fns';
 
 const MessageItem = ({ message, isOwn }: { message: Message; isOwn: boolean }) => {
@@ -78,7 +78,7 @@ const MessageItem = ({ message, isOwn }: { message: Message; isOwn: boolean }) =
 };
 
 export default function ChatWindow() {
-    const { activeChat, messages, sendMessage, isLoading } = useChat();
+    const { activeChat, messages, sendMessage, isLoading } = useChatContext();
     const [inputValue, setInputValue] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
 

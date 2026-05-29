@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { clientService } from '@/src/lib/services';
-import { Client } from '@/lib/types/complete.types';
+import { clientService } from '@/lib/client-service';
+import { Client } from '@lib/types/complete.types';
 import {
   Card,
   Button,
@@ -12,8 +12,8 @@ import {
   Modal,
   DataTable,
   TopBar,
-} from '@/src/components/ui/core-components';
-import { colors } from '@/src/theme/design-system';
+} from '@/components/ui/core-components';
+import { colors } from '@/theme/design-system';
 
 // ============================================================================
 // CLIENT MANAGEMENT COMPONENT
@@ -38,10 +38,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
     name: '',
     email: '',
     phone: '',
-    type: 'individual',
-    gst_number: '',
-    pan_number: '',
-    business_address: '',
+    type: 'INDIVIDUAL' as 'INDIVIDUAL' | 'BUSINESS',
+    businessName: '',
+    gstNumber: '',
+    panNumber: '',
+    address: '',
     state: '',
     city: '',
     pincode: '',
@@ -54,14 +55,15 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
   const loadClients = async () => {
     try {
       setLoading(true);
-      const response = await clientService.getClients(caId, {
-        page,
+      const response = await clientService.getClientsByCA(caId, {
         status: filterStatus,
         search: searchQuery,
-        limit: 10,
+        skip: (page - 1) * 10,
+        take: 10,
       });
-      setClients(response.data);
-      setTotalPages(response.totalPages);
+      setClients(response.clients);
+      // Calculate total pages if response contains count
+      setTotalPages(Math.ceil((response.total || 0) / 10));
     } catch (error) {
       console.error('Failed to load clients:', error);
     } finally {
@@ -77,10 +79,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
         name: '',
         email: '',
         phone: '',
-        type: 'individual',
-        gst_number: '',
-        pan_number: '',
-        business_address: '',
+        type: 'INDIVIDUAL',
+        businessName: '',
+        gstNumber: '',
+        panNumber: '',
+        address: '',
         state: '',
         city: '',
         pincode: '',
@@ -101,10 +104,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
         name: '',
         email: '',
         phone: '',
-        type: 'individual',
-        gst_number: '',
-        pan_number: '',
-        business_address: '',
+        type: 'INDIVIDUAL',
+        businessName: '',
+        gstNumber: '',
+        panNumber: '',
+        address: '',
         state: '',
         city: '',
         pincode: '',
@@ -123,10 +127,11 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
       name: client.name,
       email: client.email || '',
       phone: client.phone || '',
-      type: client.type,
-      gst_number: client.gst_number || '',
-      pan_number: client.pan_number || '',
-      business_address: client.business_address || '',
+      type: (client.type as 'INDIVIDUAL' | 'BUSINESS') || 'INDIVIDUAL',
+      businessName: (client as any).businessName || '',
+      gstNumber: (client as any).gstNumber || (client as any).gst_number || '',
+      panNumber: (client as any).panNumber || (client as any).pan_number || '',
+      address: (client as any).address || (client as any).business_address || '',
       state: client.state || '',
       city: client.city || '',
       pincode: client.pincode || '',
@@ -204,12 +209,12 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
                   {
                     key: 'gst_number',
                     label: 'GST Number',
-                    render: (value) => value || '-',
+                    render: (value) => String(value || '-'),
                   },
                   {
                     key: 'pan_number',
                     label: 'PAN',
-                    render: (value) => value || '-',
+                    render: (value) => String(value || '-'),
                   },
                   {
                     key: 'status',
@@ -319,36 +324,32 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
               <label className="block text-sm font-medium mb-2">Client Type</label>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as 'INDIVIDUAL' | 'BUSINESS' })}
                 className="w-full px-4 py-2 border rounded-lg"
                 style={{ borderColor: colors.neutral[200] }}
               >
-                <option value="individual">Individual</option>
-                <option value="business">Business</option>
-                <option value="startup">Startup</option>
-                <option value="huf">HUF</option>
-                <option value="partnership">Partnership</option>
-                <option value="llp">LLP</option>
+                <option value="INDIVIDUAL">Individual</option>
+                <option value="BUSINESS">Business</option>
               </select>
             </div>
             <Input
               label="GST Number"
-              value={formData.gst_number}
-              onChange={(e) => setFormData({ ...formData, gst_number: e.target.value })}
+              value={formData.gstNumber}
+              onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
             />
           </div>
 
           <Input
             label="PAN Number"
-            value={formData.pan_number}
-            onChange={(e) => setFormData({ ...formData, pan_number: e.target.value })}
+            value={formData.panNumber}
+            onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
           />
 
           <Input
             label="Business Address"
-            value={formData.business_address}
+            value={formData.address}
             onChange={(e) =>
-              setFormData({ ...formData, business_address: e.target.value })
+              setFormData({ ...formData, address: e.target.value })
             }
           />
 
@@ -411,13 +412,13 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ caId }) => {
           />
           <Input
             label="GST Number"
-            value={formData.gst_number}
-            onChange={(e) => setFormData({ ...formData, gst_number: e.target.value })}
+            value={formData.gstNumber}
+            onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
           />
           <Input
             label="PAN Number"
-            value={formData.pan_number}
-            onChange={(e) => setFormData({ ...formData, pan_number: e.target.value })}
+            value={formData.panNumber}
+            onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
           />
         </form>
       </Modal>

@@ -31,7 +31,6 @@ import {
   Image as ImageIcon,
   File,
   Check,
-  CheckCheck,
   Edit2,
   Trash2,
   Archive,
@@ -40,7 +39,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/AuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { useConversations, useMessages, useTyping } from '@/hooks/useChat';
 import { usePresence, formatLastSeen } from '@/hooks/usePresence';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
@@ -234,11 +233,7 @@ function MessageBubble({
           {message.is_edited && <span>(edited)</span>}
           {isOwn && (
             <span>
-              {message.is_read ? (
-                <CheckCheck className="h-3 w-3 text-blue-500" />
-              ) : (
-                <Check className="h-3 w-3" />
-              )}
+              <Check className="h-3 w-3" />
             </span>
           )}
         </div>
@@ -297,7 +292,7 @@ function ConversationItem({
             {conversation.last_message_preview || 'No messages yet'}
           </p>
           {(conversation.unread_count || 0) > 0 && (
-            <Badge variant="default" className="ml-2">
+            <Badge variant="info" className="ml-2">
               {conversation.unread_count}
             </Badge>
           )}

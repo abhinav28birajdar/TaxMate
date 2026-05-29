@@ -1,6 +1,6 @@
 'use client';
 
-import { Invoice } from '@/lib/types/complete.types';
+import { Invoice } from '@lib/types/complete.types';
 
 interface InvoicesListProps {
   invoices: Invoice[];
@@ -53,7 +53,7 @@ export default function InvoicesList({ invoices, loading }: InvoicesListProps) {
                 <span className="text-sm text-gray-600">{invoice.client_id}</span>
               </td>
               <td className="px-6 py-4">
-                <p className="font-medium text-gray-900">₹{invoice.amount}</p>
+                <p className="font-medium text-gray-900">₹{invoice.total_amount}</p>
               </td>
               <td className="px-6 py-4">
                 <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(invoice.status)}`}>
