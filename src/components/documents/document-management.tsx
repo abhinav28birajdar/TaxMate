@@ -316,7 +316,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ clientId
                           {status.replace('_', ' ')}
                         </Badge>
                         <p className="text-xs" style={{ color: colors.neutral[500] }}>
-                          {new Date(value).toLocaleDateString()}
+                          {new Date(value as any).toLocaleDateString()}
                         </p>
                       </div>
                     );
@@ -325,7 +325,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ clientId
                 {
                   key: 'created_at',
                   label: 'Uploaded',
-                  render: (value) => new Date(value).toLocaleDateString(),
+                  render: (value) => new Date(value as any).toLocaleDateString(),
                 },
                 {
                   key: 'id',

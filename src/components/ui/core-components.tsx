@@ -12,15 +12,16 @@ import { themeConfig, colors, shadows, borderRadius } from '@/theme/design-syste
 // BUTTON COMPONENT
 // ============================================================================
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends Omit<React.AllHTMLAttributes<any>, 'size'> {
   variant?: 'primary' | 'secondary' | 'danger' | 'outline' | 'ghost';
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   isLoading?: boolean;
   icon?: React.ReactNode;
   fullWidth?: boolean;
+  as?: any;
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+export const Button = React.forwardRef<any, ButtonProps>(
   (
     {
       variant = 'primary',
@@ -28,6 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       isLoading = false,
       icon,
       fullWidth = false,
+      as: Component = 'button',
       children,
       ...props
     },
@@ -42,7 +44,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     return (
-      <button
+      <Component
         ref={ref}
         className={`
           inline-flex items-center justify-center gap-2
@@ -57,7 +59,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {icon && !isLoading && <span className="flex">{icon}</span>}
         {isLoading && <LoadingSpinner size="sm" />}
         {children}
-      </button>
+      </Component>
     );
   }
 );

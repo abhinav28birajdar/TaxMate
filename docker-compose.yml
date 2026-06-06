@@ -1,0 +1,149 @@
+version: '3.9'
+
+services:
+  # ============================================================================
+  # PostgreSQL Database (Optional - for local development without Supabase)
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: taxmate-postgres
+    environment:
+      POSTGRES_USER: taxmate
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: taxmate
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taxmate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - taxmate_network
+
+  # ============================================================================
+  # Redis Cache (Optional - for session caching and real-time data)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: taxmate-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass password123
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - taxmate_network
+
+  # ============================================================================
+  # Next.js Application
+  # ============================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taxmate-app
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://taxmate:password123@postgres:5432/taxmate
+      REDIS_URL: redis://:password123@redis:6379
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - taxmate_network
+    command: npm run dev
+
+  # ============================================================================
+  # Adminer (Database UI - Optional)
+  # Access at http://localhost:8080
+  # ============================================================================
+  adminer:
+    image: adminer:latest
+    container_name: taxmate-adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - taxmate_network
+
+  # ============================================================================
+  # Redis Commander (Redis UI - Optional)
+  # Access at http://localhost:8081
+  # ============================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: taxmate-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:password123
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - taxmate_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  taxmate_network:
+    driver: bridge
+
+# ============================================================================
+# USAGE INSTRUCTIONS
+# ============================================================================
+#
+# 1. Copy environment variables:
+#    cp .env.example .env.local
+#    # Update with your actual Supabase keys
+#
+# 2. Start all services:
+#    docker-compose up -d
+#
+# 3. Access the application:
+#    - App: http://localhost:3000
+#    - Database: http://localhost:8080 (user: postgres, password: password123)
+#    - Redis: http://localhost:8081
+#
+# 4. View logs:
+#    docker-compose logs -f app
+#
+# 5. Run database migrations:
+#    docker-compose exec app npm run db:push
+#
+# 6. Seed sample data:
+#    docker-compose exec app npm run db:seed
+#
+# 7. Stop all services:
+#    docker-compose down
+#
+# 8. Stop and remove volumes:
+#    docker-compose down -v
+#
+# ============================================================================

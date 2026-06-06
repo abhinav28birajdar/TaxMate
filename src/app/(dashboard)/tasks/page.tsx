@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 
 export default function TasksPage() {
   const { user } = useAuth()
-  const [tasks, setTasks] = useState([])
+  const [tasks, setTasks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -44,19 +44,19 @@ export default function TasksPage() {
   // Real-time subscriptions - listen for task changes
   useRealtimeTasks(
     user?.id || '',
-    useCallback((newTask) => {
+    useCallback((newTask: any) => {
       // New task inserted
-      setTasks(prev => [newTask, ...prev])
+      setTasks((prev: any[]) => [newTask, ...prev])
       toast.success('New task added')
     }, []),
-    useCallback((updatedTask) => {
+    useCallback((updatedTask: any) => {
       // Task updated
-      setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t))
+      setTasks((prev: any[]) => prev.map((t: any) => t.id === updatedTask.id ? updatedTask : t))
       toast.success('Task updated')
     }, []),
-    useCallback((deletedTask) => {
+    useCallback((deletedTask: any) => {
       // Task deleted
-      setTasks(prev => prev.filter(t => t.id !== deletedTask.id))
+      setTasks((prev: any[]) => prev.filter((t: any) => t.id !== deletedTask.id))
       toast.success('Task deleted')
     }, [])
   )

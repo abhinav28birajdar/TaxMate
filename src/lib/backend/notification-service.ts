@@ -1,5 +1,5 @@
 import { getServiceClient } from './supabase';
-import { internalError, notFound } from './errors';
+import { internalError } from './errors';
 import { paginate } from '@/lib/utils';
 
 export async function getNotifications(userId: string, page: number = 1, limit: number = 20) {
@@ -17,8 +17,14 @@ export async function getNotifications(userId: string, page: number = 1, limit: 
     throw internalError('Failed to fetch notifications');
   }
 
+  const items = (notifications || []).map((n) => ({
+    ...n,
+    body: n.message,
+    is_read: n.read,
+  }));
+
   return {
-    items: notifications || [],
+    items,
     total: count || 0,
     page,
     limit,
@@ -39,19 +45,24 @@ export async function createNotification(
     .from('notifications')
     .insert({
       user_id: userId,
-      type,
+      type: type as any,
       title,
-      body,
-      metadata,
+      message: body,
+      metadata: metadata || {},
     })
     .select()
     .single();
 
   if (error) {
+    console.error('Create notification error:', error);
     throw internalError('Failed to create notification');
   }
 
-  return notification;
+  return {
+    ...notification,
+    body: notification.message,
+    is_read: notification.read,
+  };
 }
 
 export async function markAsRead(userId: string, notificationId?: string) {
@@ -60,7 +71,7 @@ export async function markAsRead(userId: string, notificationId?: string) {
   if (notificationId) {
     const { error } = await client
       .from('notifications')
-      .update({ is_read: true, read_at: new Date().toISOString() })
+      .update({ read: true, read_at: new Date().toISOString() })
       .eq('id', notificationId)
       .eq('user_id', userId);
 
@@ -70,9 +81,9 @@ export async function markAsRead(userId: string, notificationId?: string) {
   } else {
     const { error } = await client
       .from('notifications')
-      .update({ is_read: true, read_at: new Date().toISOString() })
+      .update({ read: true, read_at: new Date().toISOString() })
       .eq('user_id', userId)
-      .eq('is_read', false);
+      .eq('read', false);
 
     if (error) {
       throw internalError('Failed to mark notifications as read');
@@ -87,7 +98,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
     .from('notifications')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('is_read', false);
+    .eq('read', false);
 
   if (error) {
     console.error('Error fetching unread count:', error);

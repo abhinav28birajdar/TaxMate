@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let _supabase: any = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder'
+    );
+  }
+  return _supabase;
+}
 
 export const BUCKETS = {
     AVATARS: 'avatars',
@@ -31,7 +37,7 @@ export async function uploadFile(
     file: File | Buffer,
     options?: { contentType?: string; upsert?: boolean }
 ) {
-    const { data, error } = await supabase.storage
+    const { data, error } = await getSupabase().storage
         .from(bucket)
         .upload(path, file, { contentType: options?.contentType, upsert: options?.upsert });
     if (error) throw error;
@@ -39,17 +45,17 @@ export async function uploadFile(
 }
 
 export async function getSignedUrl(bucket: string, path: string, expiresIn = 3600) {
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
+    const { data, error } = await getSupabase().storage.from(bucket).createSignedUrl(path, expiresIn);
     if (error) throw error;
     return data.signedUrl;
 }
 
 export function getPublicUrl(bucket: string, path: string) {
-    return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+    return getSupabase().storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
 
 export async function deleteFile(bucket: string, paths: string[]) {
-    const { error } = await supabase.storage.from(bucket).remove(paths);
+    const { error } = await getSupabase().storage.from(bucket).remove(paths);
     if (error) throw error;
 }
 

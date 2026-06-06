@@ -440,7 +440,7 @@ export default function ClientsPage() {
   });
 
   const fetchClients = useCallback(async () => {
-    if (!user || role !== 'ca') return;
+    if (!user || String(role).toLowerCase() !== 'ca') return;
 
     try {
       setLoading(true);
@@ -594,7 +594,7 @@ export default function ClientsPage() {
   const totalPages = Math.ceil(totalClients / PAGE_SIZE);
 
   // Redirect if not CA
-  if (role && role !== 'ca') {
+  if (role && String(role).toLowerCase() !== 'ca') {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
         <div className="text-center">

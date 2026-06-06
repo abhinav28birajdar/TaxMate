@@ -488,7 +488,7 @@ export default function CasesPage() {
     overdue: cases.filter(c => c.due_date && isPast(new Date(c.due_date)) && c.status !== 'completed').length,
   };
 
-  const isCA = role === 'ca';
+  const isCA = String(role).toLowerCase() === 'ca';
 
   const fetchCases = useCallback(async () => {
     if (!user) return;

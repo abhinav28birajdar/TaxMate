@@ -213,10 +213,11 @@ export async function createUserSession(userId: string, ipAddress?: string) {
     .from('user_sessions')
     .insert({
       user_id: userId,
-      token: sessionToken,
+      token_hash: sessionToken,
       ip_address: ipAddress,
       user_agent: process.env.USER_AGENT || 'unknown',
       expires_at: expiresAt.toISOString(),
+      active: true,
     });
 
   if (error) {
@@ -235,11 +236,16 @@ export async function validateUserSession(sessionToken: string) {
 
   const { data, error } = await supabase
     .from('user_sessions')
-    .select('user_id, expires_at')
-    .eq('token', sessionToken)
+    .select('user_id, expires_at, active')
+    .eq('token_hash', sessionToken)
     .single();
 
   if (error || !data) {
+    return null;
+  }
+
+  // Check if session is revoked
+  if (!data.active) {
     return null;
   }
 
@@ -259,8 +265,8 @@ export async function invalidateUserSession(sessionToken: string) {
 
   const { error } = await supabase
     .from('user_sessions')
-    .delete()
-    .eq('token', sessionToken);
+    .update({ active: false })
+    .eq('token_hash', sessionToken);
 
   if (error) {
     console.error('Failed to invalidate session:', error);
@@ -290,17 +296,17 @@ export async function createAuditLog(
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from('audit_logs')
+    .from('activity_logs')
     .insert({
       user_id: userId,
       action,
-      resource_type: resourceType,
-      resource_id: resourceId,
+      entity_type: resourceType,
+      entity_id: resourceId,
       ip_address: ipAddress,
     });
 
   if (error) {
-    console.error('Failed to create audit log:', error);
+    console.error('Failed to create activity log:', error);
   }
 }
 
@@ -404,7 +410,7 @@ export const authService = {
       // Mark OTP as used
       const { error: updateError } = await supabase
         .from('verification_tokens')
-        .update({ used: true, usedAt: new Date().toISOString() })
+        .update({ used: true, used_at: new Date().toISOString() })
         .eq('id', tokenData.id);
 
       if (updateError) {

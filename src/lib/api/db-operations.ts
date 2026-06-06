@@ -47,7 +47,7 @@ export async function getUserProfile(userId: string) {
 
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, name, role, avatarUrl, status')
+      .select('id, email, name, role, avatar_url, status')
       .eq('id', userId)
       .single();
 
@@ -59,7 +59,14 @@ export async function getUserProfile(userId: string) {
       });
     }
 
-    return data;
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      avatarUrl: data.avatar_url,
+      status: data.status,
+    };
   }, 'getUserProfile');
 }
 
@@ -80,22 +87,32 @@ export async function createCaseRecord(
   return dbQuery(async () => {
     const supabase = await createServerClient();
 
-    // Sanitize input
     const sanitized = sanitizeObject({
       title: caseData.title,
       description: caseData.description,
-      clientId: caseData.clientId,
-      priority: caseData.priority,
     });
+
+    const priorityMap: Record<string, string> = {
+      'low': 'LOW',
+      'medium': 'MEDIUM',
+      'high': 'HIGH',
+      'urgent': 'URGENT',
+    };
+    const dbPriority = priorityMap[caseData.priority?.toLowerCase()] || 'MEDIUM';
 
     const { data, error } = await supabase
       .from('cases')
       .insert({
-        ...sanitized,
-        assignedCaId: caseData.assignedCaId,
-        createdBy: userId,
-        status: 'PENDING',
-        createdAt: new Date().toISOString(),
+        title: sanitized.title,
+        description: sanitized.description,
+        ca_id: userId,
+        client_id: caseData.clientId,
+        assigned_to: caseData.assignedCaId || userId,
+        status: 'open',
+        priority: dbPriority as any,
+        deadline: caseData.deadline,
+        case_number: `CASE-${Date.now()}`,
+        case_type: 'GENERAL',
       })
       .select()
       .single();
@@ -124,7 +141,7 @@ export async function updateCaseRecord(
     // Verify user has access to this case
     const { data: caseRecord, error: fetchError } = await supabase
       .from('cases')
-      .select('createdBy, assignedCaId')
+      .select('ca_id, assigned_to')
       .eq('id', caseId)
       .single();
 
@@ -137,8 +154,8 @@ export async function updateCaseRecord(
 
     // Check authorization
     if (
-      caseRecord.createdBy !== userId &&
-      caseRecord.assignedCaId !== userId
+      caseRecord.ca_id !== userId &&
+      caseRecord.assigned_to !== userId
     ) {
       throw new ApiError('Not authorized to update this case', {
         code: ERROR_CODES.FORBIDDEN,
@@ -150,16 +167,29 @@ export async function updateCaseRecord(
     const sanitized = sanitizeObject({
       title: caseData.title,
       description: caseData.description,
-      status: caseData.status,
-      priority: caseData.priority,
     });
+
+    const updatePayload: any = {
+      ...sanitized,
+    };
+
+    if (caseData.status !== undefined) {
+      updatePayload.status = caseData.status.toLowerCase();
+    }
+
+    if (caseData.priority !== undefined) {
+      const priorityMap: Record<string, string> = {
+        'low': 'LOW',
+        'medium': 'MEDIUM',
+        'high': 'HIGH',
+        'urgent': 'URGENT',
+      };
+      updatePayload.priority = priorityMap[caseData.priority.toLowerCase()] || 'MEDIUM';
+    }
 
     const { data, error } = await supabase
       .from('cases')
-      .update({
-        ...sanitized,
-        updatedAt: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', caseId)
       .select()
       .single();
@@ -192,14 +222,14 @@ export async function createInvoiceRecord(
     const { data, error } = await supabase
       .from('invoices')
       .insert({
-        ...sanitized,
-        clientId: invoiceData.clientId,
-        caseId: invoiceData.caseId,
+        description: sanitized.description,
+        client_id: invoiceData.clientId,
         amount: invoiceData.amount,
-        dueDate: invoiceData.dueDate,
-        createdBy: userId,
-        status: 'PENDING',
-        createdAt: new Date().toISOString(),
+        due_date: invoiceData.dueDate,
+        ca_id: userId,
+        status: 'DRAFT',
+        invoice_number: `INV-${Date.now()}`,
+        metadata: invoiceData.caseId ? { caseId: invoiceData.caseId } : {},
       })
       .select()
       .single();
@@ -228,19 +258,27 @@ export async function createAppointmentRecord(
 
     const sanitized = sanitizeObject({
       title: appointmentData.title,
-      type: appointmentData.type,
       notes: appointmentData.notes || '',
     });
+
+    const typeMap: Record<string, string> = {
+      'video_call': 'VIDEO_CALL',
+      'in_person': 'IN_PERSON',
+      'phone_call': 'PHONE_CALL',
+    };
+    const dbType = typeMap[appointmentData.type?.toLowerCase()] || 'VIDEO_CALL';
 
     const { data, error } = await supabase
       .from('appointments')
       .insert({
-        ...sanitized,
-        clientId: appointmentData.clientId,
-        caId: userId,
-        startTime: appointmentData.startTime,
-        endTime: appointmentData.endTime,
-        createdAt: new Date().toISOString(),
+        title: sanitized.title,
+        notes: sanitized.notes,
+        client_id: appointmentData.clientId,
+        ca_id: userId,
+        type: dbType as any,
+        start_time: appointmentData.startTime,
+        end_time: appointmentData.endTime,
+        status: 'PENDING',
       })
       .select()
       .single();
@@ -271,11 +309,11 @@ export async function createMessageRecord(
     const { data, error } = await supabase
       .from('messages')
       .insert({
-        ...sanitized,
-        conversationId: messageData.conversationId,
-        senderId: userId,
-        fileUrl: messageData.fileUrl,
-        createdAt: new Date().toISOString(),
+        content: sanitized.content,
+        conversation_id: messageData.conversationId,
+        sender_id: userId,
+        message_type: messageData.fileUrl ? 'FILE' : 'TEXT',
+        metadata: messageData.fileUrl ? { fileUrl: messageData.fileUrl } : {},
       })
       .select()
       .single();
@@ -285,7 +323,7 @@ export async function createMessageRecord(
     // Update conversation last message timestamp
     await supabase
       .from('conversations')
-      .update({ lastMessageAt: new Date().toISOString() })
+      .update({ last_message_at: new Date().toISOString() })
       .eq('id', messageData.conversationId);
 
     return data;

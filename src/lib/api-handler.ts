@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from './auth';
+import { createClient } from '@/utils/supabase/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { redis } from './redis';
 import * as Sentry from '@sentry/nextjs';
@@ -29,19 +29,29 @@ export function createProtectedHandler(
             }
 
             // Auth check
-            const session = await auth();
-            if (!session?.user) {
+            const supabase = await createClient();
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session?.user) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
             }
 
+            // Get user role from custom users table
+            const { data: userProfile } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', session.user.id)
+                .single();
+
+            const userRole = userProfile?.role || session.user.user_metadata?.role || 'CLIENT';
+
             // Role check
-            if (options.roles && !options.roles.includes(session.user.role)) {
+            if (options.roles && !options.roles.includes(userRole)) {
                 return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
             }
 
             return await handler(req, {
                 userId: session.user.id,
-                userRole: session.user.role,
+                userRole,
                 session,
             });
         } catch (error) {

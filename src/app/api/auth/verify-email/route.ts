@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // Find verification token
     const { data: verificationData, error: verificationError } = await supabase
       .from('verification_tokens')
-      .select('identifier, expires_at, used')
+      .select('user_id, expires_at, used')
       .eq('token', token)
       .eq('type', 'EMAIL_VERIFICATION')
       .single();
@@ -54,12 +54,13 @@ export async function POST(request: NextRequest) {
       .from('users')
       .update({
         status: 'ACTIVE',
-        emailVerified: true,
-        emailVerifiedAt: new Date().toISOString(),
+        email_verified: true,
+        email_verified_at: new Date().toISOString(),
       })
-      .eq('id', verificationData.identifier);
+      .eq('id', verificationData.user_id);
 
     if (updateError) {
+      console.error('User update error:', updateError);
       return NextResponse.json(
         { success: false, error: 'Failed to verify email' },
         { status: 500 }
@@ -69,26 +70,26 @@ export async function POST(request: NextRequest) {
     // Mark token as used
     await supabase
       .from('verification_tokens')
-      .update({ used: true, usedAt: new Date().toISOString() })
+      .update({ used: true, used_at: new Date().toISOString() })
       .eq('token', token);
 
     // Create audit log
     await createAuditLog(
-      verificationData.identifier,
+      verificationData.user_id,
       'EMAIL_VERIFIED',
       'USER',
-      verificationData.identifier
+      verificationData.user_id
     );
 
     // Confirm email in Supabase Auth
     const { data: user } = await supabase
       .from('users')
       .select('email')
-      .eq('id', verificationData.identifier)
+      .eq('id', verificationData.user_id)
       .single();
 
     if (user?.email) {
-      await supabase.auth.admin.updateUserById(verificationData.identifier, {
+      await supabase.auth.admin.updateUserById(verificationData.user_id, {
         email_confirm: true,
       });
     }

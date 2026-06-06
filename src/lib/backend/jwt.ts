@@ -41,7 +41,7 @@ export async function signAccessToken(payload: {
 export async function verifyAccessToken(token: string): Promise<JWTPayload> {
   try {
     const verified = await jwtVerify(token, secret);
-    return verified.payload as JWTPayload;
+    return verified.payload as unknown as JWTPayload;
   } catch (error) {
     if (error instanceof errors.JWTClaimValidationFailed) {
       throw unauthorized('Token claims invalid');

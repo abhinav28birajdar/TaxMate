@@ -33,7 +33,7 @@ import {
   formatNotificationTime,
 } from '@/hooks/useNotifications';
 
-const notificationIcons: Record<Notification['type'], React.ComponentType<{ className?: string }>> = {
+const notificationIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   message: MessageSquare,
   case_update: FileText,
   appointment: Calendar,
@@ -43,7 +43,7 @@ const notificationIcons: Record<Notification['type'], React.ComponentType<{ clas
   system: AlertCircle,
 };
 
-const notificationColors: Record<Notification['type'], string> = {
+const notificationColors: Record<string, string> = {
   message: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
   case_update: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
   appointment: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',

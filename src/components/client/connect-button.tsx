@@ -22,7 +22,7 @@ export default function ConnectButton({ caId, className }: ConnectButtonProps) {
 
     // Check existing status on mount
     React.useEffect(() => {
-        if (!user || role !== 'client') return;
+        if (!user || String(role).toLowerCase() !== 'client') return;
 
         const checkStatus = async () => {
             const { data } = await supabase
@@ -49,7 +49,7 @@ export default function ConnectButton({ caId, className }: ConnectButtonProps) {
             return;
         }
 
-        if (role !== 'client') {
+        if (String(role).toLowerCase() !== 'client') {
             toast({
                 title: "Action Restricted",
                 description: "Only clients can send connection requests.",
@@ -104,7 +104,7 @@ export default function ConnectButton({ caId, className }: ConnectButtonProps) {
         }
     };
 
-    if (role === 'ca' && user?.id === caId) return null; // Don't show on own profile (if viewing as public)
+    if (String(role).toLowerCase() === 'ca' && user?.id === caId) return null; // Don't show on own profile (if viewing as public)
 
     if (status === 'pending') {
         return (

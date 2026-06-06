@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { useAuth } from './SupabaseAuthContext';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface Notification {
   id: string;
   user_id: string;
   title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'reminder';
+  message?: string;
+  body?: string;
+  type: string;
   category?: string;
   action_url?: string | null;
   action_label?: string | null;
@@ -18,7 +19,6 @@ export interface Notification {
   entity_id?: string | null;
   is_read: boolean;
   read_at: string | null;
-  is_archived: boolean;
   created_at: string;
 }
 
@@ -56,13 +56,17 @@ export function useNotifications(): UseNotificationsReturn {
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
-        .eq('is_archived', false)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (fetchError) throw fetchError;
 
-      setNotifications(data || []);
+      const mapped = (data || []).map((n: any) => ({
+        ...n,
+        body: n.message || n.body,
+        is_read: n.read ?? false,
+      }));
+      setNotifications(mapped);
       setError(null);
     } catch (err: any) {
       console.error('Error fetching notifications:', err);
@@ -81,7 +85,7 @@ export function useNotifications(): UseNotificationsReturn {
       const { error: updateError } = await supabase
         .from('notifications')
         .update({
-          is_read: true,
+          read: true,
           read_at: new Date().toISOString(),
         })
         .eq('id', notificationId)
@@ -92,8 +96,8 @@ export function useNotifications(): UseNotificationsReturn {
       setNotifications(prev =>
         prev.map(n =>
           n.id === notificationId
-            ? { ...n, is_read: true, read_at: new Date().toISOString() }
-            : n
+            ? { ...n, is_read: true, read_at: new Date().toISOString(), body: n.body || n.message }
+            : { ...n, body: n.body || n.message }
         )
       );
     } catch (err) {
@@ -110,11 +114,11 @@ export function useNotifications(): UseNotificationsReturn {
       const { error: updateError } = await supabase
         .from('notifications')
         .update({
-          is_read: true,
+          read: true,
           read_at: new Date().toISOString(),
         })
         .eq('user_id', user.id)
-        .eq('is_read', false);
+        .eq('read', false);
 
       if (updateError) throw updateError;
 
@@ -123,6 +127,7 @@ export function useNotifications(): UseNotificationsReturn {
           ...n,
           is_read: true,
           read_at: n.read_at || new Date().toISOString(),
+          body: n.body || n.message,
         }))
       );
     } catch (err) {
@@ -156,13 +161,14 @@ export function useNotifications(): UseNotificationsReturn {
     try {
       const supabase = createClient();
       
-      const { error: updateError } = await supabase
+      // Since there is no is_archived column, we delete read notifications to clear them.
+      const { error: deleteError } = await supabase
         .from('notifications')
-        .update({ is_archived: true })
+        .delete()
         .eq('user_id', user.id)
-        .eq('is_read', true);
+        .eq('read', true);
 
-      if (updateError) throw updateError;
+      if (deleteError) throw deleteError;
 
       setNotifications(prev => prev.filter(n => !n.is_read));
     } catch (err) {
@@ -197,7 +203,12 @@ export function useNotifications(): UseNotificationsReturn {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          const newNotification = payload.new as Notification;
+          const raw = payload.new as any;
+          const newNotification = {
+            ...raw,
+            body: raw.message || raw.body,
+            is_read: raw.read ?? false,
+          } as Notification;
           setNotifications(prev => [newNotification, ...prev]);
 
           // Show browser notification if permitted
@@ -219,7 +230,12 @@ export function useNotifications(): UseNotificationsReturn {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          const updatedNotification = payload.new as Notification;
+          const raw = payload.new as any;
+          const updatedNotification = {
+            ...raw,
+            body: raw.message || raw.body,
+            is_read: raw.read ?? false,
+          } as Notification;
           setNotifications(prev =>
             prev.map(n => (n.id === updatedNotification.id ? updatedNotification : n))
           );
@@ -234,7 +250,7 @@ export function useNotifications(): UseNotificationsReturn {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          const deletedId = (payload.old as Notification).id;
+          const deletedId = (payload.old as any).id;
           setNotifications(prev => prev.filter(n => n.id !== deletedId));
         }
       )

@@ -7,19 +7,20 @@ export async function logActivity(params: {
   resourceId?: string;
   metadata?: unknown;
   ipAddress?: string;
+  userAgent?: string;
 }): Promise<void> {
   try {
     const client = getServiceClient();
-    // Fire and forget - don't await
-    client
+    await client
       .from('activity_logs')
       .insert({
         user_id: params.userId,
         action: params.action,
-        resource_type: params.resourceType,
-        resource_id: params.resourceId,
-        metadata: params.metadata || {},
+        entity_type: params.resourceType,
+        entity_id: params.resourceId,
+        details: params.metadata || {},
         ip_address: params.ipAddress,
+        user_agent: params.userAgent,
       });
   } catch (error) {
     console.error('Activity logging failed:', error);
@@ -36,8 +37,7 @@ export async function logAudit(params: {
 }): Promise<void> {
   try {
     const client = getServiceClient();
-    // Fire and forget - don't await
-    client
+    await client
       .from('audit_logs')
       .insert({
         table_name: params.tableName,
@@ -59,8 +59,7 @@ export async function logSystem(
 ): Promise<void> {
   try {
     const client = getServiceClient();
-    // Fire and forget - don't await
-    client
+    await client
       .from('system_logs')
       .insert({
         level,

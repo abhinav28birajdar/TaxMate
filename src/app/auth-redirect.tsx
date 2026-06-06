@@ -2,10 +2,12 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/AuthHook';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 
 export default function PageRedirect() {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
+  const user = (auth as any).user;
+  const loading = (auth as any).loading ?? (auth as any).isLoading;
   const router = useRouter();
 
   useEffect(() => {

@@ -356,7 +356,7 @@ export class AIRecommendationService {
 
       let recommendations: AIRecommendation[] = [];
 
-      if (user.role === 'ca') {
+      if (String(user.role).toLowerCase() === 'ca') {
         const { data: caProfile } = await this.supabase
           .from('ca_profiles')
           .select('*')
@@ -367,7 +367,7 @@ export class AIRecommendationService {
           const serviceRecs = await this.generateServiceRecommendations(caProfile.id);
           recommendations.push(...serviceRecs);
         }
-      } else if (user.role === 'client') {
+      } else if (String(user.role).toLowerCase() === 'client') {
         const { data: clientProfile } = await this.supabase
           .from('client_profiles')
           .select('*')

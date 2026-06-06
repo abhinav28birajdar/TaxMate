@@ -16,6 +16,7 @@ import {
     Star,
     BarChart3,
     ChevronRight,
+    Briefcase,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -90,9 +91,9 @@ const CyberCorner = ({ position }: { position: 'top-left' | 'top-right' | 'botto
 
 export function DashboardSidebar() {
     const pathname = usePathname();
-    const { role, user, profile, loading, signOut } = useAuth();
+    const { role, user, isLoading, signOut } = useAuth();
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="hidden lg:flex flex-col h-full border-r border-primary/10 bg-black w-64">
                 <div className="h-16 flex items-center px-6 border-b border-primary/10">
@@ -107,9 +108,9 @@ export function DashboardSidebar() {
         );
     }
 
-    const links = role === 'ca' ? caLinks : clientLinks;
-    const displayName = profile?.first_name || user?.user_metadata?.first_name || 'User';
-    const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+    const links = String(role).toLowerCase() === 'ca' ? caLinks : clientLinks;
+    const displayName = user?.name || 'User';
+    const avatarUrl = user?.avatarUrl;
 
     return (
         <div className="hidden lg:flex flex-col h-full border-r border-green-500/10 bg-black w-64 relative group">
@@ -121,8 +122,8 @@ export function DashboardSidebar() {
                         <div className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-green-500" />
                         <div className="absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-green-500" />
                     </div>
-                    <span className="text-foreground">
-                        Fin<span className="text-green-400">Bank</span>
+                    <span className="text-foreground text-green-400">
+                        TaxMate
                     </span>
                 </Link>
             </div>
@@ -193,7 +194,7 @@ export function DashboardSidebar() {
                             <div className="flex items-center gap-1.5 mt-0.5">
                                 <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
                                 <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold truncate">
-                                    {role === 'ca' ? 'Operator: 01' : 'Level: 01'}
+                                    {String(role).toLowerCase() === 'ca' ? 'Operator: 01' : 'Level: 01'}
                                 </p>
                             </div>
                         </div>

@@ -95,7 +95,7 @@ export default function EnhancedAuthForms({ initialMode = 'login' }: EnhancedAut
       toast.success('Account created successfully!');
       
       // Redirect based on role and onboarding status
-      if (data.role === 'ca') {
+      if (String(data.role).toLowerCase() === 'ca') {
         toast.success('Please complete the verification process to use your account.');
         // Redirect to CA onboarding will happen via protected routes
       }

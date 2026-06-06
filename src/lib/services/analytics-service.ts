@@ -308,7 +308,7 @@ export class AnalyticsService {
    * Generate dashboard summary
    */
   async getDashboardSummary(userId: string, role: string): Promise<any> {
-    if (role === 'ca') {
+    if (String(role).toLowerCase() === 'ca') {
       const { data: caProfile } = await this.supabase
         .from('ca_profiles')
         .select('*')
@@ -328,7 +328,7 @@ export class AnalyticsService {
           lastUpdated: new Date().toISOString(),
         };
       }
-    } else if (role === 'client') {
+    } else if (String(role).toLowerCase() === 'client') {
       const { data: clientProfile } = await this.supabase
         .from('client_profiles')
         .select('*')

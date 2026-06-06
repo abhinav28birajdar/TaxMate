@@ -47,11 +47,11 @@ export async function POST(request: NextRequest) {
 
       return {
         id: result.id,
-        clientId: result.clientId,
+        clientId: result.client_id || result.clientId,
         amount: result.amount,
         status: result.status,
-        dueDate: result.dueDate,
-        createdAt: result.createdAt,
+        dueDate: result.due_date || result.dueDate,
+        createdAt: result.created_at || result.createdAt,
       };
     },
     {
@@ -80,20 +80,36 @@ export async function GET(request: NextRequest) {
       let query = supabase
         .from('invoices')
         .select('*', { count: 'exact' })
-        .or(`createdBy.eq.${user.sub},clientId.eq.${user.sub}`);
+        .or(`ca_id.eq.${user.sub},client_id.eq.${user.sub}`);
 
       if (status) {
-        query = query.eq('status', status);
+        query = query.eq('status', status.toUpperCase());
       }
 
       const { data, count, error } = await query
-        .order('createdAt', { ascending: false })
+        .order('created_at', { ascending: false })
         .range((page - 1) * limit, page * limit - 1);
 
       if (error) throw error;
 
+      const invoices = (data || []).map((item) => ({
+        id: item.id,
+        caId: item.ca_id,
+        clientId: item.client_id,
+        invoiceNumber: item.invoice_number,
+        description: item.description,
+        amount: item.amount,
+        status: item.status,
+        dueDate: item.due_date,
+        paidAt: item.paid_at,
+        issuedAt: item.issued_at,
+        metadata: item.metadata,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      }));
+
       return {
-        invoices: data || [],
+        invoices,
         pagination: {
           page,
           limit,

@@ -46,16 +46,16 @@ export default function InvoicesPage() {
   // Real-time subscriptions
   useRealtimeInvoices(
     user?.id || '',
-    useCallback((newInvoice) => {
-      setInvoices(prev => [newInvoice, ...prev]);
+    useCallback((newInvoice: any) => {
+      setInvoices((prev: Invoice[]) => [newInvoice, ...prev]);
       toast.success('New invoice created');
     }, []),
-    useCallback((updatedInvoice) => {
-      setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
+    useCallback((updatedInvoice: any) => {
+      setInvoices((prev: Invoice[]) => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
       toast.success('Invoice updated');
     }, []),
-    useCallback((deletedInvoice) => {
-      setInvoices(prev => prev.filter(inv => inv.id !== deletedInvoice.id));
+    useCallback((deletedInvoice: any) => {
+      setInvoices((prev: Invoice[]) => prev.filter(inv => inv.id !== deletedInvoice.id));
       toast.success('Invoice deleted');
     }, [])
   );

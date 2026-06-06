@@ -71,6 +71,7 @@ export interface ComplianceItem {
   clientId: string;
   title: string;
   description: string;
+  category?: string;
   type: 'gst' | 'itr' | 'tds' | 'esi' | 'epf' | 'audit' | 'other';
   dueDate: string;
   status: 'not-started' | 'in-progress' | 'completed' | 'overdue';

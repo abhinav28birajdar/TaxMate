@@ -1,3 +1,4 @@
+'use client';
 import React from 'react';
 import { Card, Badge, Button } from '@/components/ui/core-components';
 

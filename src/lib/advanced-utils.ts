@@ -16,7 +16,7 @@ export function calculateClientLTV(
  * Calculate customer acquisition cost (CAC)
  */
 export function calculateCAC(marketingCost: number, newClients: number): number {
-  return new Customers / newClients;
+  return marketingCost / newClients;
 }
 
 /**

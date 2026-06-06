@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('verification_tokens')
       .insert([{
-        identifier: userId,
+        user_id: userId,
         token: verificationToken,
         type: 'EMAIL_VERIFICATION',
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),

@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/UnifiedAuthContext';
 import Link from 'next/link';
 
 export default function TopBar() {
-  const { user, profile, signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
@@ -29,11 +29,11 @@ export default function TopBar() {
           {/* Profile */}
           <div className="flex items-center gap-3">
             <div>
-              <p className="font-medium text-gray-900">{profile?.display_name || user?.email || 'User'}</p>
-              <p className="text-sm text-gray-600 capitalize">{profile?.first_name}</p>
+              <p className="font-medium text-gray-900">{user?.name || user?.email || 'User'}</p>
+              <p className="text-sm text-gray-600 capitalize">{user?.role?.toLowerCase()}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
-              {(profile?.display_name || user?.email || 'U').charAt(0).toUpperCase()}
+              {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
           </div>
 

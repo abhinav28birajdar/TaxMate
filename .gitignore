@@ -1,53 +1,172 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ============================================================================
+# GIT IGNORE - TaxMate Production Application
+# ============================================================================
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
+# ============================================================================
+# Dependencies & Package Manager
+# ============================================================================
+node_modules/
+.pnp
+.pnp.js
+.yarn/
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.yarn/install-state.gz
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
 
-# testing
-/coverage
+# ============================================================================
+# Next.js Build & Runtime
+# ============================================================================
+.next/
+out/
+build/
+dist/
+.vercel/
+.env*.local
+.env*.production
+.env.local.example
+.env.production.local
 
-# next.js
-/.next/
-/out/
+# ============================================================================
+# Environment Variables & Secrets
+# ============================================================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+!.env.example
+!.env.local.example
 
-# production
-/build
+# ============================================================================
+# Testing
+# ============================================================================
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+*.lcov
 
-# misc
+# ============================================================================
+# IDE & Editor
+# ============================================================================
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
 .DS_Store
-*.pem
+Thumbs.db
+*.code-workspace
 
-# debug
+# ============================================================================
+# Runtime & Logs
+# ============================================================================
+npm-debug.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+lerna-debug.log*
+*.log
+logs/
+.pm2/
+dist/
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
+# ============================================================================
+# TypeScript
+# ============================================================================
 *.tsbuildinfo
 next-env.d.ts
+tsconfig.tsbuildinfo
 
-# SQL files and database
-*.sql
-supabase/
+# ============================================================================
+# Database & Storage
+# ============================================================================
 *.sqlite
+*.sqlite3
 *.db
+*.db-wal
+*.db-shm
+# Note: Keep supabase/schema.sql, only ignore local migrations
+supabase/migrations/
+supabase/.test.sql
+*.sql.local
 
-# Environment and secrets
-.env
+# ============================================================================
+# OS Files
+# ============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# ============================================================================
+# Temporary Files
+# ============================================================================
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
+*.pid
+*.seed
+*.seed.*
+
+# ============================================================================
+# Build Artifacts
+# ============================================================================
+dist/
+build/
+public/static/
+.next/
+out/
+
+# ============================================================================
+# Docker
+# ============================================================================
+.dockerignore
+docker-compose.override.yml
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+.github/workflows/
+!.github/workflows/deploy.yml
+.gitlab-ci.yml
+.travis.yml
+
+# ============================================================================
+# Development Tools
+# ============================================================================
+.vscode-test/
+.code-workspace
+*.code-workspace
+
+# ============================================================================
+# Prisma
+# ============================================================================
+prisma/migrations/
+prisma/*.db
+prisma/*.db-journal
 .env.local
 .env.*.local
 .env.production.local
@@ -99,3 +218,7 @@ VERCEL_DEPLOYMENT_GUIDE.md
 
 # Local backup files
 *.backup
+
+# Local scripts & verification utilities
+verify-auth-system.sh
+

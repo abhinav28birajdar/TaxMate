@@ -1,4 +1,4 @@
-﻿/**
+/**
  * UNIFIED SERVICES LAYER
  * Complete API operations for all features
  * 
@@ -137,6 +137,26 @@ export const taskService = {
       .eq('id', taskId);
     if (error) throw error;
   },
+
+  async getTasks(caId: string, options?: { status?: string; limit?: number }) {
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .eq('ca_id', caId);
+    if (options?.status) {
+      if (options.status === 'pending') {
+        query = query.in('status', ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'ON_HOLD']);
+      } else {
+        query = query.eq('status', options.status.toUpperCase());
+      }
+    }
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    return { data: data || [] };
+  },
 };
 
 // ============================================================================
@@ -200,6 +220,42 @@ export const invoiceService = {
       .delete()
       .eq('id', invoiceId);
     if (error) throw error;
+  },
+
+  async getInvoices(caId: string, options?: { status?: string; limit?: number }) {
+    let query = supabase
+      .from('invoices')
+      .select('*')
+      .eq('ca_id', caId);
+    if (options?.status) {
+      if (options.status === 'pending') {
+        query = query.in('status', ['DRAFT', 'SENT', 'VIEWED', 'PARTIALLY_PAID', 'OVERDUE']);
+      } else {
+        query = query.eq('status', options.status.toUpperCase());
+      }
+    }
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    const mapped = (data || []).map((inv: any) => ({
+      ...inv,
+      total_amount: inv.amount,
+      status: inv.status?.toLowerCase(),
+    }));
+    return { data: mapped };
+  },
+
+  async getRevenueAnalytics(caId: string) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('amount')
+      .eq('ca_id', caId)
+      .eq('status', 'PAID');
+    if (error) throw error;
+    const total = (data || []).reduce((sum, inv: any) => sum + Number(inv.amount || 0), 0);
+    return { total_revenue: total };
   },
 };
 
@@ -334,6 +390,62 @@ export const documentService = {
       url: urlData.publicUrl,
       name: file.name
     };
+  },
+
+  async getDocuments(clientId: string) {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    const mapped = (data || []).map((doc: any) => ({
+      ...doc,
+      category: doc.document_type || 'other',
+    }));
+    return { data: mapped };
+  },
+
+  async uploadDocument(clientId: string, caId: string, file: File, category: string) {
+    const uploadResult = await this.upload(file, clientId, category);
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({
+        user_id: clientId,
+        client_id: clientId,
+        ca_id: caId,
+        file_name: file.name,
+        file_type: file.type || file.name.split('.').pop() || '',
+        file_size: file.size,
+        file_url: uploadResult.url,
+        document_type: category,
+        metadata: { category, path: uploadResult.path },
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteDocument(documentId: string) {
+    const { data: doc } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single();
+    
+    if (doc) {
+      const path = doc.metadata?.path || doc.file_url.split('/documents/').pop();
+      if (path) {
+        await supabase.storage.from('documents').remove([path]);
+      }
+    }
+
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', documentId);
+    if (error) throw error;
   },
 };
 
@@ -558,6 +670,15 @@ export const clientService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async getClientStats(caId: string) {
+    const { count, error } = await supabase
+      .from('client_profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('ca_id', caId);
+    if (error) throw error;
+    return { total_clients: count || 0 };
   },
 };
 

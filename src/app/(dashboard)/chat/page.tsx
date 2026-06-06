@@ -320,7 +320,7 @@ function NewConversationDialog({
     setLoading(true);
     try {
       // Search based on role - CAs search clients, clients search CAs
-      const table = role === 'ca' ? 'client_profiles' : 'ca_profiles';
+      const table = String(role).toLowerCase() === 'ca' ? 'client_profiles' : 'ca_profiles';
       const { data } = await supabase
         .from(table)
         .select('user_id, first_name, last_name, avatar_url')
@@ -356,7 +356,7 @@ function NewConversationDialog({
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={`Search ${role === 'ca' ? 'clients' : 'CAs'}...`}
+              placeholder={`Search ${String(role).toLowerCase() === 'ca' ? 'clients' : 'CAs'}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"

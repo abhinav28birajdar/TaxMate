@@ -29,7 +29,7 @@ export default function MainDashboardPage() {
 
   const userProfile = {
     name: user?.name || user?.email?.split('@')[0] || 'User',
-    email: user?.email || 'user@finbank.com',
+    email: user?.email || 'user@taxmate.com',
     accountBalance: 24582.50,
     monthlySpend: 8392.00,
   };
@@ -339,9 +339,9 @@ export default function MainDashboardPage() {
         {/* Bottom CTA Section */}
         <Card className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 p-8">
           <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-2xl font-bold text-white mb-3">Unlock Premium Banking</h2>
+            <h2 className="text-2xl font-bold text-white mb-3">Unlock Premium Features</h2>
             <p className="text-gray-400 mb-6">
-              Get exclusive benefits, higher limits, and premium support with FinBank Premium.
+              Get exclusive benefits, advanced analytics, and priority support with TaxMate Premium.
             </p>
             <button className="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-8 rounded-lg transition">
               Upgrade Now
