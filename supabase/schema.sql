@@ -926,4 +926,70 @@ ALTER PUBLICATION supabase_realtime ADD TABLE payments;
 ALTER PUBLICATION supabase_realtime ADD TABLE compliance_items;
 ALTER PUBLICATION supabase_realtime ADD TABLE cases;
 
+-- ============================================================================
+-- REAL-TIME PRESENCE & CHAT TABLES
+-- ============================================================================
+
+-- User Presence table
+CREATE TABLE IF NOT EXISTS user_presence (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE NOT NULL,
+  status TEXT DEFAULT 'offline' CHECK (status IN ('online', 'away', 'busy', 'offline')),
+  last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+  current_page TEXT,
+  device_info JSONB DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Message Read Receipts table
+CREATE TABLE IF NOT EXISTS message_read_receipts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id UUID REFERENCES messages(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  read_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(message_id, user_id)
+);
+
+-- Typing Indicators table
+CREATE TABLE IF NOT EXISTS typing_indicators (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  is_typing BOOLEAN DEFAULT false,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(conversation_id, user_id)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_user_presence_user_id ON user_presence(user_id);
+CREATE INDEX IF NOT EXISTS idx_message_read_receipts_message_id ON message_read_receipts(message_id);
+CREATE INDEX IF NOT EXISTS idx_typing_indicators_conversation_id ON typing_indicators(conversation_id);
+
+-- Triggers for updated_at
+CREATE TRIGGER tr_user_presence_updated_at BEFORE UPDATE ON user_presence
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER tr_typing_indicators_updated_at BEFORE UPDATE ON typing_indicators
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Enable RLS
+ALTER TABLE user_presence ENABLE ROW LEVEL SECURITY;
+ALTER TABLE message_read_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE typing_indicators ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY user_presence_select ON user_presence FOR SELECT USING (true);
+CREATE POLICY user_presence_write ON user_presence FOR ALL USING (auth.uid()::text = user_id::text);
+
+CREATE POLICY message_read_receipts_select ON message_read_receipts FOR SELECT USING (true);
+CREATE POLICY message_read_receipts_write ON message_read_receipts FOR ALL USING (auth.uid()::text = user_id::text);
+
+CREATE POLICY typing_indicators_select ON typing_indicators FOR SELECT USING (true);
+CREATE POLICY typing_indicators_write ON typing_indicators FOR ALL USING (auth.uid()::text = user_id::text);
+
+-- Enable real-time for new tables
+ALTER PUBLICATION supabase_realtime ADD TABLE user_presence;
+ALTER PUBLICATION supabase_realtime ADD TABLE message_read_receipts;
+ALTER PUBLICATION supabase_realtime ADD TABLE typing_indicators;
+
 COMMIT;

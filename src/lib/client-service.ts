@@ -3,63 +3,103 @@ import { createClient } from '@/utils/supabase/server';
 export const clientService = {
   // Create client
   async createClient(caId: string, data: {
-    name: string;
-    email?: string;
+    fullName: string;
+    displayName?: string;
+    email: string;
     phone?: string;
-    type: 'INDIVIDUAL' | 'BUSINESS';
-    businessName?: string;
-    panNumber?: string;
-    gstNumber?: string;
-    annualIncome?: number;
+    alternatePhone?: string;
+    clientType: 'individual' | 'company' | 'huf' | 'trust' | 'partnership' | 'llp';
+    pan?: string;
+    aadhaar?: string;
+    gstin?: string;
+    tan?: string;
+    cin?: string;
+    dateOfBirth?: string;
+    dateOfIncorporation?: string;
     address?: string;
     city?: string;
     state?: string;
     pincode?: string;
+    country?: string;
+    status?: 'active' | 'inactive' | 'prospect' | 'archived';
+    source?: 'referral' | 'walk_in' | 'online' | 'other';
+    riskLevel?: 'low' | 'medium' | 'high';
+    notes?: string;
     tags?: string[];
+    portalAccess?: boolean;
   }) {
     const supabase = await createClient();
 
-    // 1. Create user in users table
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .insert({
-        name: data.name,
-        email: data.email || `client_${Date.now()}@taxmate.com`,
-        phone: data.phone,
-        role: 'CLIENT',
-        status: 'ACTIVE',
-        onboarding_completed: false,
-      })
-      .select()
+    // 1. Get CA's organization_id
+    const { data: caProfile, error: caProfileError } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', caId)
       .single();
 
-    if (userError) throw userError;
+    if (caProfileError || !caProfile?.organization_id) {
+      throw new Error(`CA organization not found: ${caProfileError?.message || 'Empty ID'}`);
+    }
 
-    // 2. Create client profile
-    const { data: profile, error: profileError } = await supabase
-      .from('client_profiles')
+    const orgId = caProfile.organization_id;
+
+    // 2. Create profile in auth if portal access requested
+    let portalUserId = null;
+    if (data.portalAccess && data.email) {
+      const { data: userAuth, error: authError } = await supabase.auth.admin.createUser({
+        email: data.email,
+        password: 'password123', // temporary default password
+        email_confirm: true,
+        user_metadata: {
+          role: 'client',
+          name: data.fullName,
+          organization_id: orgId
+        }
+      });
+      if (!authError && userAuth?.user) {
+        portalUserId = userAuth.user.id;
+      } else if (authError) {
+        console.error('Portal user creation error (continuing without portal access):', authError.message);
+      }
+    }
+
+    // 3. Create client record
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
       .insert({
-        user_id: user.id,
-        ca_id: caId,
-        pan_number: data.panNumber,
-        gstin: data.gstNumber,
-        business_name: data.businessName,
-        business_type: data.type,
+        organization_id: orgId,
+        assigned_ca_id: caId,
+        client_type: data.clientType,
+        full_name: data.fullName,
+        display_name: data.displayName || data.fullName,
+        email: data.email,
+        phone: data.phone,
+        alternate_phone: data.alternatePhone,
+        pan: data.pan,
+        aadhaar: data.aadhaar,
+        gstin: data.gstin,
+        tan: data.tan,
+        cin: data.cin,
+        date_of_birth: data.dateOfBirth ? data.dateOfBirth : null,
+        date_of_incorporation: data.dateOfIncorporation ? data.dateOfIncorporation : null,
+        address: data.address,
         city: data.city,
         state: data.state,
         pincode: data.pincode,
-        bank_account_number: undefined, // Default empty
+        country: data.country || 'India',
+        status: data.status || 'active',
+        source: data.source || 'other',
+        risk_level: data.riskLevel || 'low',
+        notes: data.notes,
+        tags: data.tags || [],
+        portal_access: !!portalUserId,
+        portal_user_id: portalUserId
       })
       .select()
       .single();
 
-    if (profileError) throw profileError;
-
-    return {
-      ...user,
-      ...profile,
-      id: profile.id, // Ensure id matches client_profile id
-    };
+    if (clientError) throw clientError;
+    return client;
   },
 
   // Get all clients for CA
@@ -73,21 +113,21 @@ export const clientService = {
     const supabase = await createClient();
 
     let query = supabase
-      .from('client_profiles')
-      .select(`
-        *,
-        user:users!client_profiles_user_id_fkey (
-          id,
-          name,
-          email,
-          phone,
-          status
-        )
-      `, { count: 'exact' })
-      .eq('ca_id', caId);
+      .from('clients')
+      .select('*', { count: 'exact' })
+      .eq('assigned_ca_id', caId);
 
-    if (filters?.type) {
-      query = query.eq('business_type', filters.type);
+    if (filters?.type && filters.type !== 'all') {
+      query = query.eq('client_type', filters.type);
+    }
+    if (filters?.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters?.search) {
+      query = query.or(
+        `full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,pan.ilike.%${filters.search}%,gstin.ilike.%${filters.search}%`
+      );
     }
 
     const skip = filters?.skip || 0;
@@ -98,139 +138,95 @@ export const clientService = {
       .range(skip, skip + take - 1);
 
     const { data, error, count } = await query;
-
     if (error) throw error;
 
-    // Filter by search term on client-side or add in query if needed
-    let clients = (data || []).map((profile: any) => ({
-      ...profile,
-      name: profile.user?.name || '',
-      email: profile.user?.email || '',
-      phone: profile.user?.phone || '',
-      status: profile.user?.status?.toLowerCase() || 'active',
-      gst_number: profile.gstin || '',
-      pan_number: profile.pan_number || '',
-    }));
-
-    if (filters?.search) {
-      const search = filters.search.toLowerCase();
-      clients = clients.filter(c => 
-        c.name.toLowerCase().includes(search) ||
-        c.email.toLowerCase().includes(search) ||
-        c.gst_number.toLowerCase().includes(search) ||
-        c.pan_number.toLowerCase().includes(search)
-      );
-    }
-
-    return { clients, total: count || clients.length };
+    return { clients: data || [], total: count || 0 };
   },
 
   // Get client by ID
   async getClientById(clientId: string) {
     const supabase = await createClient();
 
-    const { data: profile, error } = await supabase
-      .from('client_profiles')
-      .select(`
-        *,
-        user:users!client_profiles_user_id_fkey (
-          id,
-          name,
-          email,
-          phone,
-          status
-        )
-      `)
+    const { data: client, error } = await supabase
+      .from('clients')
+      .select('*')
       .eq('id', clientId)
       .single();
 
     if (error) throw error;
 
-    // Fetch related items in parallel
-    const [documents, tasks, invoices, appointments, taxFilings, notes] = await Promise.all([
-      supabase.from('documents').select('*').eq('client_id', profile.user_id),
-      supabase.from('tasks').select('*').eq('client_id', profile.user_id),
-      supabase.from('invoices').select('*').eq('client_id', profile.user_id),
-      supabase.from('appointments').select('*').eq('client_id', profile.user_id),
-      supabase.from('tax_filings').select('*').eq('client_id', profile.user_id),
-      supabase.from('notes').select('*').eq('user_id', profile.user_id),
+    // Fetch related records in parallel using client ID
+    const [documents, tasks, invoices, appointments, compliance, notes] = await Promise.all([
+      supabase.from('documents').select('*').eq('client_id', clientId),
+      supabase.from('tasks').select('*').eq('client_id', clientId),
+      supabase.from('invoices').select('*').eq('client_id', clientId),
+      supabase.from('appointments').select('*').eq('client_id', clientId),
+      supabase.from('compliance_records').select('*').eq('client_id', clientId),
+      supabase.from('client_notes').select('*').eq('client_id', clientId),
     ]);
 
     return {
-      ...profile,
-      name: profile.user?.name || '',
-      email: profile.user?.email || '',
-      phone: profile.user?.phone || '',
-      status: profile.user?.status || 'ACTIVE',
+      ...client,
       documents: documents.data || [],
       tasks: tasks.data || [],
       invoices: invoices.data || [],
       appointments: appointments.data || [],
-      taxFilings: taxFilings.data || [],
+      complianceRecords: compliance.data || [],
       notes: notes.data || [],
     };
   },
 
   // Update client
-  async updateClient(clientId: string, data: any) {
+  async updateClient(clientId: string, data: Partial<any>) {
     const supabase = await createClient();
 
-    // Fetch original profile first to get user_id
-    const { data: original } = await supabase
-      .from('client_profiles')
-      .select('user_id')
-      .eq('id', clientId)
-      .single();
-
-    if (!original) throw new Error('Client not found');
-
-    // Update users table if name/email/phone provided
-    if (data.name || data.email || data.phone || data.status) {
-      await supabase
-        .from('users')
-        .update({
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          status: data.status ? data.status.toUpperCase() : undefined,
-        })
-        .eq('id', original.user_id);
-    }
-
-    // Update client profile table
-    const { data: profile, error } = await supabase
-      .from('client_profiles')
+    const { data: updatedClient, error } = await supabase
+      .from('clients')
       .update({
-        pan_number: data.panNumber || data.pan_number,
-        gstin: data.gstNumber || data.gst_number || data.gstin,
-        business_name: data.businessName || data.business_name,
-        business_type: data.type || data.business_type,
+        full_name: data.fullName || data.full_name,
+        display_name: data.displayName || data.display_name,
+        email: data.email,
+        phone: data.phone,
+        alternate_phone: data.alternatePhone || data.alternate_phone,
+        pan: data.pan,
+        aadhaar: data.aadhaar,
+        gstin: data.gstin,
+        tan: data.tan,
+        cin: data.cin,
+        date_of_birth: data.dateOfBirth || data.date_of_birth,
+        date_of_incorporation: data.dateOfIncorporation || data.date_of_incorporation,
+        address: data.address,
         city: data.city,
         state: data.state,
         pincode: data.pincode,
+        country: data.country,
+        status: data.status,
+        source: data.source,
+        risk_level: data.riskLevel || data.risk_level,
+        notes: data.notes,
+        tags: data.tags,
+        portal_access: data.portalAccess || data.portal_access
       })
       .eq('id', clientId)
       .select()
       .single();
 
     if (error) throw error;
-    return profile;
+    return updatedClient;
   },
 
   // Delete client
   async deleteClient(clientId: string) {
     const supabase = await createClient();
+    const { data: client } = await supabase.from('clients').select('portal_user_id').eq('id', clientId).single();
+    
+    // 1. Delete client record (cascades)
+    const { error } = await supabase.from('clients').delete().eq('id', clientId);
+    if (error) throw error;
 
-    // Get original profile to get user_id
-    const { data: original } = await supabase
-      .from('client_profiles')
-      .select('user_id')
-      .eq('id', clientId)
-      .single();
-
-    if (original) {
-      // Cascade delete starting from users
-      await supabase.from('users').delete().eq('id', original.user_id);
+    // 2. Delete auth portal user if linked
+    if (client?.portal_user_id) {
+      await supabase.auth.admin.deleteUser(client.portal_user_id);
     }
 
     return { success: true };
@@ -240,21 +236,12 @@ export const clientService = {
   async getClientTimeline(clientId: string, limit: number = 50) {
     const supabase = await createClient();
 
-    // Get client profile to get user_id
-    const { data: original } = await supabase
-      .from('client_profiles')
-      .select('user_id')
-      .eq('id', clientId)
-      .single();
-
-    if (!original) throw new Error('Client not found');
-
     const [tasks, documents, invoices, appointments, notes] = await Promise.all([
-      supabase.from('tasks').select('*').eq('client_id', original.user_id).order('updated_at', { ascending: false }).limit(limit),
-      supabase.from('documents').select('*').eq('client_id', original.user_id).order('created_at', { ascending: false }).limit(limit),
-      supabase.from('invoices').select('*').eq('client_id', original.user_id).order('created_at', { ascending: false }).limit(limit),
-      supabase.from('appointments').select('*').eq('client_id', original.user_id).order('start_time', { ascending: false }).limit(limit),
-      supabase.from('notes').select('*').eq('user_id', original.user_id).order('created_at', { ascending: false }).limit(limit),
+      supabase.from('tasks').select('*').eq('client_id', clientId).order('updated_at', { ascending: false }).limit(limit),
+      supabase.from('documents').select('*').eq('client_id', clientId).order('created_at', { ascending: false }).limit(limit),
+      supabase.from('invoices').select('*').eq('client_id', clientId).order('created_at', { ascending: false }).limit(limit),
+      supabase.from('appointments').select('*').eq('client_id', clientId).order('start_time', { ascending: false }).limit(limit),
+      supabase.from('client_notes').select('*').eq('client_id', clientId).order('created_at', { ascending: false }).limit(limit),
     ]);
 
     return {
@@ -266,30 +253,29 @@ export const clientService = {
     };
   },
 
-  // Add tags to client
-  async addTagToClient(clientId: string, tag: string) {
+  // Add tag to client
+  async addTagToClient(clientId: string, tagName: string) {
     const supabase = await createClient();
-    const { data: client } = await supabase.from('client_profiles').select('metadata').eq('id', clientId).single();
+    const { data: client } = await supabase.from('clients').select('tags').eq('id', clientId).single();
     if (!client) throw new Error('Client not found');
 
-    const tags = Array.isArray(client.metadata?.tags) ? client.metadata.tags : [];
-    if (!tags.includes(tag)) {
-      tags.push(tag);
-      await supabase.from('client_profiles').update({
-        metadata: { ...client.metadata, tags }
-      }).eq('id', clientId);
+    const tags = Array.isArray(client.tags) ? client.tags : [];
+    if (!tags.includes(tagName)) {
+      tags.push(tagName);
+      await supabase.from('clients').update({ tags }).eq('id', clientId);
     }
   },
 
   // Get clients by tag
-  async getClientsByTag(caId: string, tag: string) {
+  async getClientsByTag(caId: string, tagName: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
-      .from('client_profiles')
+      .from('clients')
       .select('*')
-      .eq('ca_id', caId);
+      .eq('assigned_ca_id', caId)
+      .contains('tags', [tagName]);
 
     if (error) throw error;
-    return (data || []).filter(c => Array.isArray(c.metadata?.tags) && c.metadata.tags.includes(tag));
+    return data || [];
   },
 };

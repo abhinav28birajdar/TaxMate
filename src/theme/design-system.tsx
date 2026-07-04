@@ -11,32 +11,32 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 // ============================================================================
 
 export const colors = {
-  // Primary: Purple Accent (#8B5DFF)
+  // Primary: Lime Accent (#65a30d)
   primary: {
-    50: '#faf5ff',
-    100: '#f3e8ff',
-    200: '#e9d5ff',
-    300: '#d8b4fe',
-    400: '#c084fc',
-    500: '#a855f7',
-    600: '#9333ea',
-    700: '#7e22ce',
-    800: '#6b21a8',
-    900: '#581c87',
+    50: '#f7fee7',
+    100: '#ecfccb',
+    200: '#d9f99d',
+    300: '#bef264',
+    400: '#a3e635',
+    500: '#84cc16',
+    600: '#65a30d',
+    700: '#4d7c0f',
+    800: '#3f6212',
+    900: '#365314',
   },
 
-  // Success: Emerald (keeping for status states)
+  // Success: Lime/Emerald
   success: {
-    50: '#f0fdf4',
-    100: '#dcfce7',
-    200: '#bbf7d0',
-    300: '#86efac',
-    400: '#4ade80',
-    500: '#22c55e',
-    600: '#16a34a',
-    700: '#15803d',
-    800: '#166534',
-    900: '#134e4a',
+    50: '#f7fee7',
+    100: '#ecfccb',
+    200: '#d9f99d',
+    300: '#bef264',
+    400: '#a3e635',
+    500: '#84cc16',
+    600: '#65a30d',
+    700: '#4d7c0f',
+    800: '#3f6212',
+    900: '#365314',
   },
 
   // Tertiary: Red (Alerts/Danger)
@@ -81,29 +81,29 @@ export const colors = {
     900: '#0c3d66',
   },
 
-  // Neutral: Dark-Focused Grayscale
+  // Neutral: Slate-Based Grayscale
   neutral: {
-    50: '#f8f9fb', // Light Background
-    100: '#f3f4f6',
-    150: '#eff0f3',
-    200: '#e5e7eb', // Light Border
-    250: '#d1d5db',
-    300: '#a1a1aa', // Secondary text
-    400: '#71717a',  // Muted text
-    500: '#6b7280', // Secondary Text Light
-    600: '#4b5563',
-    700: '#374151',
-    800: '#1f1f1f', // Dark Border
-    900: '#111111', // Dark Card
-    950: '#0b0b0c', // Dark Background
+    50: '#f8fafc',
+    100: '#f1f5f9',
+    150: '#e2e8f0',
+    200: '#cbd5e1',
+    250: '#94a3b8', // slate-400
+    300: '#64748b',
+    400: '#475569',
+    500: '#334155', // slate-700 for dark borders
+    600: '#1e293b', // slate-800 for dark cards
+    700: '#0f172a', // slate-900 for dark sidebars
+    800: '#0f172a',
+    900: '#020617', // slate-950 for dark page bg
+    950: '#020617',
   },
 
   // Background Sets
   background: {
-    default: '#f8f9fb',
-    secondary: '#ffffff',
-    dark: '#0b0b0c',
-    darkSecondary: '#111111',
+    default: '#020617',
+    secondary: '#0f172a',
+    dark: '#020617',
+    darkSecondary: '#1e293b',
   },
 };
 

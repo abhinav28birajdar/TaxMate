@@ -60,10 +60,10 @@ export function hasPermission(userRole: string, permission: keyof typeof PERMISS
 }
 
 // React hook
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
 export function usePermission(permission: keyof typeof PERMISSIONS): boolean {
-    const { data: session } = useSession();
-    const userRole = (session?.user as any)?.role;
+    const { user } = useAuth();
+    const userRole = user?.role;
     if (!userRole) return false;
     return hasPermission(userRole, permission);
 }

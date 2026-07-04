@@ -17,6 +17,7 @@ import {
     BarChart3,
     ChevronRight,
     Briefcase,
+    Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,28 +29,37 @@ const caLinks = [
     {
         section: 'MAIN', items: [
             { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
+        ]
+    },
+    {
+        section: 'WORK', items: [
             { icon: Users, label: 'Clients', href: '/clients' },
-            { icon: Briefcase, label: 'Cases', href: '/cases' },
-            { icon: MessageSquare, label: 'Messages', href: '/chat' },
-            { icon: Calendar, label: 'Appointments', href: '/appointments' },
+            { icon: Briefcase, label: 'Tasks', href: '/tasks' },
+            { icon: FileText, label: 'Documents', href: '/documents' },
+            { icon: Star, label: 'Compliance', href: '/compliance' },
         ]
     },
     {
         section: 'FINANCE', items: [
             { icon: FileText, label: 'Invoices', href: '/invoices' },
-            { icon: CreditCard, label: 'Payments', href: '/payments' },
-            { icon: BarChart3, label: 'Analytics', href: '/billing' },
+            { icon: DollarSign, label: 'Expenses', href: '/expenses' },
+            { icon: Clock, label: 'Time Tracking', href: '/time' },
         ]
     },
     {
-        section: 'COMPLIANCE', items: [
-            { icon: FileText, label: 'Documents', href: '/documents' },
-            { icon: Star, label: 'Tax Filings', href: '/tax-filings' },
+        section: 'COMMUNICATION', items: [
+            { icon: MessageSquare, label: 'Messages', href: '/messages' },
+            { icon: Calendar, label: 'Appointments', href: '/appointments' },
         ]
     },
     {
-        section: 'SETTINGS', items: [
-            { icon: Settings, label: 'Settings', href: '/settings' },
+        section: 'INSIGHTS', items: [
+            { icon: BarChart3, label: 'Analytics', href: '/analytics' },
+        ]
+    },
+    {
+        section: 'ADMIN', items: [
+            { icon: Settings, label: 'Admin Panel', href: '/admin' },
         ]
     }
 ];
@@ -57,21 +67,20 @@ const caLinks = [
 const clientLinks = [
     {
         section: 'MAIN', items: [
-            { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-            { icon: MessageSquare, label: 'Messages', href: '/chat' },
-            { icon: Calendar, label: 'Appointments', href: '/appointments' },
+            { icon: LayoutDashboard, label: 'Dashboard', href: '/portal/dashboard' },
+            { icon: MessageSquare, label: 'Messages', href: '/portal/messages' },
+            { icon: Calendar, label: 'Appointments', href: '/portal/appointments' },
         ]
     },
     {
         section: 'FINANCE', items: [
-            { icon: FileText, label: 'My Invoices', href: '/invoices' },
-            { icon: CreditCard, label: 'Payments', href: '/payments' },
+            { icon: FileText, label: 'Invoices', href: '/portal/invoices' },
         ]
     },
     {
         section: 'COMPLIANCE', items: [
-            { icon: FileText, label: 'My Documents', href: '/documents' },
-            { icon: Star, label: 'My Filings', href: '/tax-filings' },
+            { icon: FileText, label: 'Documents', href: '/portal/documents' },
+            { icon: Star, label: 'Compliance', href: '/portal/compliance' },
         ]
     },
 ];
@@ -85,7 +94,7 @@ const CyberCorner = ({ position }: { position: 'top-left' | 'top-right' | 'botto
     };
 
     return (
-        <div className={`absolute w-1.5 h-1.5 ${positions[position]} border-green-500 opacity-50`} />
+        <div className={`absolute w-1.5 h-1.5 ${positions[position]} border-primary/50`} />
     );
 };
 
@@ -108,21 +117,21 @@ export function DashboardSidebar() {
         );
     }
 
-    const links = String(role).toLowerCase() === 'ca' ? caLinks : clientLinks;
+    const links = String(role).toLowerCase() === 'client' ? clientLinks : caLinks;
     const displayName = user?.name || 'User';
     const avatarUrl = user?.avatarUrl;
 
     return (
-        <div className="hidden lg:flex flex-col h-full border-r border-green-500/10 bg-black w-64 relative group">
+        <div className="hidden lg:flex flex-col h-full border-r border-lime-600/10 bg-black w-64 relative group">
             {/* Header */}
-            <div className="h-16 flex items-center px-6 border-b border-green-500/10 relative">
+            <div className="h-16 flex items-center px-6 border-b border-lime-600/10 relative">
                 <Link href="/dashboard" className="flex items-center gap-3 font-black text-xl tracking-tighter uppercase italic text-foreground group/logo">
-                    <div className="relative w-8 h-8 bg-green-500/10 border border-green-500/30 rounded flex items-center justify-center group-hover/logo:border-green-500 transition-colors">
-                        <CreditCard className="w-4 h-4 text-green-400" />
-                        <div className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-green-500" />
-                        <div className="absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-green-500" />
+                    <div className="relative w-8 h-8 bg-lime-600/10 border border-lime-600/30 rounded flex items-center justify-center group-hover/logo:border-lime-600 transition-colors">
+                        <CreditCard className="w-4 h-4 text-lime-500" />
+                        <div className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-lime-600" />
+                        <div className="absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-lime-600" />
                     </div>
-                    <span className="text-foreground text-green-400">
+                    <span className="text-foreground text-lime-500">
                         TaxMate
                     </span>
                 </Link>
@@ -134,7 +143,7 @@ export function DashboardSidebar() {
                     {links.map((section) => (
                         <div key={section.section} className="space-y-1">
                             <div className="px-3 mb-2">
-                                <span className="text-[10px] uppercase tracking-[0.3em] font-black text-green-500/50">
+                                <span className="text-[10px] uppercase tracking-[0.3em] font-black text-lime-600/50">
                                     {section.section}
                                 </span>
                             </div>
@@ -148,17 +157,17 @@ export function DashboardSidebar() {
                                             className={cn(
                                                 "w-full justify-start gap-4 h-11 transition-all rounded-none border-l-2",
                                                 isActive
-                                                    ? "bg-green-500/5 text-green-400 border-green-500 font-black italic uppercase tracking-widest text-[11px]"
+                                                    ? "bg-lime-600/5 text-lime-500 border-lime-600 font-black italic uppercase tracking-widest text-[11px]"
                                                     : "text-muted-foreground border-transparent hover:text-foreground hover:bg-white/5 font-bold uppercase tracking-widest text-[11px]"
                                             )}
                                         >
                                             <link.icon className={cn(
                                                 "w-4 h-4",
-                                                isActive ? "text-green-400 animate-pulse" : "text-muted-foreground"
+                                                isActive ? "text-lime-500 animate-pulse" : "text-muted-foreground"
                                             )} />
                                             {link.label}
                                             {link.label === 'Messages' && (
-                                                <div className="ml-auto w-2 h-2 bg-green-500 animate-ping rounded-full" />
+                                                <div className="ml-auto w-2 h-2 bg-lime-600 animate-ping rounded-full" />
                                             )}
                                             {isActive && <ChevronRight className="ml-auto h-3 w-3 animate-in fade-in slide-in-from-left-2" />}
                                         </Button>
@@ -177,24 +186,24 @@ export function DashboardSidebar() {
             </ScrollArea>
 
             {/* User Section */}
-            <div className="p-4 border-t border-green-500/10 space-y-4">
-                <div className="relative p-3 bg-white/5 border border-green-500/5 hover:border-green-500/20 transition-all rounded-none group/user overflow-hidden">
+            <div className="p-4 border-t border-lime-600/10 space-y-4">
+                <div className="relative p-3 bg-white/5 border border-lime-600/5 hover:border-lime-600/20 transition-all rounded-none group/user overflow-hidden">
                     <div className="flex items-center gap-3 relative z-10">
                         <div className="relative">
-                            <Avatar className="h-10 w-10 border border-green-500/20 rounded-none p-0.5">
+                            <Avatar className="h-10 w-10 border border-lime-600/20 rounded-none p-0.5">
                                 <AvatarImage src={avatarUrl} className="rounded-none object-cover" />
-                                <AvatarFallback className="bg-green-500/10 text-green-400 font-black italic rounded-none">
+                                <AvatarFallback className="bg-lime-600/10 text-lime-500 font-black italic rounded-none">
                                     {displayName[0]?.toUpperCase()}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-black rounded-full" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-lime-600 border-2 border-black rounded-full" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-xs font-black uppercase italic tracking-wider truncate text-foreground">{displayName}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                                <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
+                                <div className="w-1 h-1 bg-lime-600 rounded-full animate-pulse" />
                                 <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold truncate">
-                                    {String(role).toLowerCase() === 'ca' ? 'Operator: 01' : 'Level: 01'}
+                                    {String(role).toLowerCase() !== 'client' ? 'Operator: 01' : 'Level: 01'}
                                 </p>
                             </div>
                         </div>
@@ -203,7 +212,7 @@ export function DashboardSidebar() {
 
                 <Button
                     variant="ghost"
-                    className="w-full justify-start gap-3 h-10 text-muted-foreground hover:text-green-400 hover:bg-green-500/5 rounded-none font-bold uppercase tracking-widest text-[10px] transition-all"
+                    className="w-full justify-start gap-3 h-10 text-muted-foreground hover:text-lime-500 hover:bg-lime-600/5 rounded-none font-bold uppercase tracking-widest text-[10px] transition-all"
                     onClick={signOut}
                 >
                     <LogOut className="w-3.5 h-3.5" />

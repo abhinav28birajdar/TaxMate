@@ -1,56 +1,355 @@
-// lib/seed-database.ts
-// Comprehensive database seeding with realistic Taxmate data
+// src/lib/seed-database.ts
+// Comprehensive database seeding using Supabase Service Role client
+
+import { loadEnvConfig } from '@next/env';
+loadEnvConfig(process.cwd());
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+
+if (!supabaseUrl || !serviceKey) {
+  console.error('⚠️ Supabase credentials missing from environment variables.');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, serviceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export async function seedDatabase() {
   try {
     console.log('🌱 Starting database seeding...');
 
-    // Seed users (CAs and Clients)
-    await seedUsers();
-    console.log('✅ Users seeded');
+    const testUsers = [
+      { email: 'ca@taxmate.com', name: 'Rajesh Kumar', role: 'ca', orgName: 'Kumar & Associates' },
+      { email: 'staff@taxmate.com', name: 'Priya Sharma', role: 'staff' },
+      { email: 'client@taxmate.com', name: 'ABC Enterprises', role: 'client' }
+    ];
 
-    // Seed CA profiles
-    await seedCAProfiles();
-    console.log('✅ CA profiles seeded');
+    console.log('🧹 Cleaning up existing test users...');
+    for (const u of testUsers) {
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', u.email)
+        .maybeSingle();
 
-    // Seed clients
-    await seedClients();
-    console.log('✅ Clients seeded');
+      if (existing) {
+        // Delete from auth.users (cascades to profiles)
+        await supabase.auth.admin.deleteUser(existing.id);
+        console.log(`Deleted existing user: ${u.email}`);
+      }
+    }
 
-    // Seed services
-    await seedServices();
-    console.log('✅ Services seeded');
+    console.log('👤 Creating CA User Rajesh Kumar...');
+    const { data: caAuth, error: caErr } = await supabase.auth.admin.createUser({
+      email: 'ca@taxmate.com',
+      password: 'password123',
+      email_confirm: true,
+      user_metadata: {
+        role: 'ca',
+        name: 'Rajesh Kumar',
+        organization_name: 'Kumar & Associates'
+      }
+    });
 
-    // Seed documents
-    await seedDocuments();
-    console.log('✅ Documents seeded');
+    if (caErr) throw caErr;
+    const caId = caAuth.user.id;
+    console.log(`Created CA Auth user: ${caId}`);
 
-    // Seed invoices and payments
-    await seedInvoices();
-    console.log('✅ Invoices seeded');
+    // Wait a brief moment for the database trigger to complete profile creation
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    // Seed tasks
-    await seedTasks();
-    console.log('✅ Tasks seeded');
+    // Get the generated organization ID for Rajesh Kumar
+    const { data: caProfile, error: profErr } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', caId)
+      .single();
 
-    // Seed compliance data
-    await seedCompliance();
-    console.log('✅ Compliance data seeded');
+    if (profErr || !caProfile.organization_id) {
+      throw new Error(`Failed to retrieve organization ID: ${profErr?.message}`);
+    }
+    const orgId = caProfile.organization_id;
+    console.log(`Retrieved Organization ID: ${orgId}`);
 
-    // Seed GST & ITR data
-    await seedGSTITR();
-    console.log('✅ GST & ITR data seeded');
+    console.log('👤 Creating Staff User Priya Sharma...');
+    const { data: staffAuth, error: staffErr } = await supabase.auth.admin.createUser({
+      email: 'staff@taxmate.com',
+      password: 'password123',
+      email_confirm: true,
+      user_metadata: {
+        role: 'staff',
+        name: 'Priya Sharma',
+        organization_id: orgId
+      }
+    });
 
-    // Seed workflow automations
-    await seedWorkflows();
-    console.log('✅ Workflows seeded');
+    if (staffErr) throw staffErr;
+    const staffId = staffAuth.user.id;
+    console.log(`Created Staff Auth user: ${staffId}`);
+
+    console.log('👤 Creating Client User ABC Enterprises...');
+    const { data: clientAuth, error: clientErr } = await supabase.auth.admin.createUser({
+      email: 'client@taxmate.com',
+      password: 'password123',
+      email_confirm: true,
+      user_metadata: {
+        role: 'client',
+        name: 'ABC Enterprises',
+        organization_id: orgId
+      }
+    });
+
+    if (clientErr) throw clientErr;
+    const clientUserId = clientAuth.user.id;
+    console.log(`Created Client Auth user: ${clientUserId}`);
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    console.log('🏢 Creating Client Profile in clients table...');
+    const { data: clientRow, error: clientRowErr } = await supabase
+      .from('clients')
+      .insert({
+        organization_id: orgId,
+        assigned_ca_id: caId,
+        client_type: 'company',
+        full_name: 'ABC Enterprises Pvt Ltd',
+        display_name: 'ABC Enterprises',
+        email: 'client@taxmate.com',
+        phone: '+91-9876543211',
+        pan: 'AAACA1234A',
+        aadhaar: '123456789012',
+        gstin: '27AAACA1234A1Z5',
+        address: '101, Business Park, Bandra East',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        pincode: '400051',
+        status: 'active',
+        source: 'referral',
+        risk_level: 'low',
+        portal_access: true,
+        portal_user_id: clientUserId,
+        kyc_verified: true,
+        kyc_verified_at: new Date().toISOString()
+      })
+      .select('id')
+      .single();
+
+    if (clientRowErr) throw clientRowErr;
+    const clientId = clientRow.id;
+    console.log(`Created Client record: ${clientId}`);
+
+    console.log('🏷️ Seeding Tags...');
+    const { data: tagRows } = await supabase
+      .from('tags')
+      .insert([
+        { organization_id: orgId, name: 'VIP', color: '#65a30d', type: 'client' },
+        { organization_id: orgId, name: 'Urgent', color: '#ef4444', type: 'task' },
+        { organization_id: orgId, name: 'Tax Return', color: '#3b82f6', type: 'document' }
+      ])
+      .select();
+
+    console.log('📋 Seeding Master Compliance Deadlines...');
+    await supabase.from('compliance_deadlines').insert([
+      { compliance_type: 'gst_r1', period_type: 'monthly', day_of_month: 11, description: 'GST GSTR-1 Return Filing', is_active: true },
+      { compliance_type: 'gst_r3b', period_type: 'monthly', day_of_month: 20, description: 'GST GSTR-3B Return Filing', is_active: true },
+      { compliance_type: 'itr_1', period_type: 'annual', day_of_month: 31, month_of_year: 7, description: 'Individual Income Tax Return Filing', is_active: true },
+      { compliance_type: 'tds_26q', period_type: 'quarterly', day_of_month: 31, month_of_year: 7, description: 'Quarterly TDS Statement - Salaries', is_active: true }
+    ]);
+
+    console.log('📅 Seeding Compliance Records...');
+    const { data: compRows } = await supabase
+      .from('compliance_records')
+      .insert([
+        {
+          organization_id: orgId,
+          client_id: clientId,
+          compliance_type: 'gst_r1',
+          financial_year: '2025-26',
+          assessment_year: '2026-27',
+          period_start: '2026-05-01',
+          period_end: '2026-05-31',
+          due_date: '2026-06-11',
+          status: 'pending'
+        },
+        {
+          organization_id: orgId,
+          client_id: clientId,
+          compliance_type: 'itr_1',
+          financial_year: '2025-26',
+          assessment_year: '2026-27',
+          period_start: '2025-04-01',
+          period_end: '2026-03-31',
+          due_date: '2026-07-31',
+          status: 'in_progress'
+        }
+      ])
+      .select();
+
+    console.log('📝 Seeding Tasks...');
+    const { data: taskRows } = await supabase
+      .from('tasks')
+      .insert([
+        {
+          organization_id: orgId,
+          client_id: clientId,
+          created_by: caId,
+          assigned_to: staffId,
+          title: 'Prepare GST returns for ABC Enterprises',
+          description: 'Review sale registers, compute tax liability, and prepare GSTR-1 file draft.',
+          task_type: 'gst_filing',
+          priority: 'high',
+          status: 'in_progress',
+          due_date: '2026-06-10',
+          financial_year: '2025-26',
+          billable: true,
+          tags: ['Urgent']
+        },
+        {
+          organization_id: orgId,
+          client_id: clientId,
+          created_by: caId,
+          assigned_to: caId,
+          title: 'Review ITR documentation',
+          description: 'Gather Form 26AS, AIS, and capital gains reports.',
+          task_type: 'itr_filing',
+          priority: 'medium',
+          status: 'not_started',
+          due_date: '2026-07-20',
+          financial_year: '2025-26',
+          billable: false
+        }
+      ])
+      .select();
+
+    const gstTaskId = taskRows?.[0]?.id;
+
+    if (gstTaskId) {
+      console.log('💬 Seeding Task Comments...');
+      await supabase.from('task_comments').insert([
+        {
+          task_id: gstTaskId,
+          author_id: staffId,
+          content: 'I have started compiling the purchase invoices. Awaiting client bank statement.',
+          is_internal: true
+        }
+      ]);
+    }
+
+    console.log('📄 Seeding Documents...');
+    await supabase.from('documents').insert([
+      {
+        organization_id: orgId,
+        client_id: clientId,
+        uploaded_by: caId,
+        file_name: 'PAN_Card_ABC_Enterprises.pdf',
+        file_path: 'uploads/pan_card.pdf',
+        file_size: 1048576,
+        file_type: 'pdf',
+        mime_type: 'application/pdf',
+        category: 'identity',
+        financial_year: '2025-26',
+        description: 'PAN card upload for KYC verification',
+        is_shared_with_client: true
+      },
+      {
+        organization_id: orgId,
+        client_id: clientId,
+        uploaded_by: clientUserId,
+        file_name: 'Bank_Statement_May_2026.xlsx',
+        file_path: 'uploads/bank_statement_may_2026.xlsx',
+        file_size: 2048576,
+        file_type: 'xlsx',
+        mime_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        category: 'financial',
+        financial_year: '2025-26',
+        description: 'May 2026 bank transactions log'
+      }
+    ]);
+
+    console.log('💵 Seeding Invoices & Line Items...');
+    const { data: invRows } = await supabase
+      .from('invoices')
+      .insert({
+        organization_id: orgId,
+        client_id: clientId,
+        created_by: caId,
+        invoice_date: '2026-06-01',
+        due_date: '2026-06-15',
+        status: 'sent',
+        subtotal: 10000.00,
+        tax_percentage: 18.00,
+        tax_amount: 1800.00,
+        total_amount: 11800.00,
+        balance_due: 11800.00,
+        payment_terms: 'net_15',
+        notes: 'Thank you for your business!'
+      })
+      .select();
+
+    const invId = invRows?.[0]?.id;
+
+    if (invId) {
+      await supabase.from('invoice_line_items').insert({
+        invoice_id: invId,
+        description: 'Consultation & GST filing service charges - Q1',
+        quantity: 1,
+        unit_price: 10000.00,
+        amount: 10000.00,
+        sort_order: 1
+      });
+    }
+
+    console.log('📅 Seeding Appointments...');
+    await supabase.from('appointments').insert({
+      organization_id: orgId,
+      client_id: clientId,
+      ca_id: caId,
+      created_by: caId,
+      title: 'Tax Consultation & GST Review',
+      description: 'Consultation on current filings and GST liability validation.',
+      appointment_type: 'video_call',
+      status: 'confirmed',
+      start_time: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
+      end_time: new Date(Date.now() + 90000000).toISOString(),
+      duration_minutes: 60,
+      location: 'video',
+      livekit_room_name: 'consultation-abc'
+    });
+
+    console.log('💬 Seeding Messages & Realtime Conversations...');
+    const { data: convRows } = await supabase
+      .from('conversations')
+      .insert({
+        organization_id: orgId,
+        type: 'client',
+        title: 'ABC Enterprises Chat',
+        client_id: clientId
+      })
+      .select();
+
+    const convId = convRows?.[0]?.id;
+
+    if (convId) {
+      // Add participants
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: convId, user_id: caId, role: 'admin' },
+        { conversation_id: convId, user_id: clientUserId, role: 'member' }
+      ]);
+
+      // Add messages
+      await supabase.from('messages').insert([
+        { conversation_id: convId, sender_id: caId, content: 'Hello ABC team, please upload your May bank statement.' },
+        { conversation_id: convId, sender_id: clientUserId, content: 'Hi Rajesh, I have uploaded the statement in the portal documents section.' }
+      ]);
+    }
 
     console.log('🎉 Database seeding completed!');
     return { success: true, message: 'Database seeded successfully' };
@@ -60,340 +359,12 @@ export async function seedDatabase() {
   }
 }
 
-async function seedUsers() {
-  // CA User
-  const caUser = {
-    id: 'ca-user-001',
-    email: 'ca@taxmate.com',
-    role: 'CA',
-    name: 'Rajesh Kumar',
-    phone: '+91-9876543210',
-    verified: true,
-  };
-
-  // Client Users
-  const clientUsers = [
-    { id: 'client-001', email: 'abc@business.com', role: 'CLIENT', name: 'ABC Enterprises', phone: '+91-8765432109' },
-    { id: 'client-002', email: 'xyz@retail.com', role: 'CLIENT', name: 'XYZ Retail Store', phone: '+91-7654321098' },
-    { id: 'client-003', email: 'tech@startup.com', role: 'CLIENT', name: 'Tech Startup India', phone: '+91-6543210987' },
-  ];
-
-  // Staff User
-  const staffUser = {
-    id: 'staff-001',
-    email: 'priya@taxmate.com',
-    role: 'STAFF',
-    name: 'Priya Sharma',
-    phone: '+91-9123456789',
-  };
-
-  // Insert users
-  await supabase.from('users').insert([caUser, ...clientUsers, staffUser]);
-}
-
-async function seedCAProfiles() {
-  const caProfile = {
-    id: 'ca-user-001',
-    firm_name: 'Kumar & Associates',
-    gst_number: '27ABC1234D12Z5',
-    experience: 12,
-    kyc_verified: true,
-    specialization: ['GST Compliance', 'ITR Filing', 'Business Audit'],
-    rating: 4.8,
-    reviews: 45,
-  };
-
-  await supabase.from('ca_profiles').insert([caProfile]);
-}
-
-async function seedClients() {
-  const clients = [
-    {
-      ca_id: 'ca-user-001',
-      name: 'ABC Enterprises',
-      type: 'BUSINESS',
-      gst: '27ABC1234D12Z5',
-      pan: 'ABCD1234E',
-      email: 'abc@business.com',
-      phone: '+91-8765432109',
-      status: 'ACTIVE',
-    },
-    {
-      ca_id: 'ca-user-001',
-      name: 'XYZ Retail Store',
-      type: 'BUSINESS',
-      gst: '27XYZ5678F90Z1',
-      pan: 'XYZF1234E',
-      email: 'xyz@retail.com',
-      phone: '+91-7654321098',
-      status: 'ACTIVE',
-    },
-    {
-      ca_id: 'ca-user-001',
-      name: 'Tech Startup India',
-      type: 'STARTUP',
-      gst: '27TECH1122G45Z3',
-      pan: 'TECH1234E',
-      email: 'tech@startup.com',
-      phone: '+91-6543210987',
-      status: 'ACTIVE',
-    },
-  ];
-
-  await supabase.from('clients').insert(clients);
-}
-
-async function seedServices() {
-  const services = [
-    {
-      ca_id: 'ca-user-001',
-      name: 'GST Filing',
-      description: 'Monthly GST return filing and compliance',
-      price: 5000,
-      category: 'GST_COMPLIANCE',
-      duration_days: 5,
-    },
-    {
-      ca_id: 'ca-user-001',
-      name: 'ITR Filing',
-      description: 'Annual income tax return filing',
-      price: 7500,
-      category: 'ITR_FILING',
-      duration_days: 15,
-    },
-    {
-      ca_id: 'ca-user-001',
-      name: 'Annual Audit',
-      description: 'Complete financial audit and compliance',
-      price: 25000,
-      category: 'AUDIT',
-      duration_days: 30,
-    },
-    {
-      ca_id: 'ca-user-001',
-      name: 'GST Reconciliation',
-      description: 'GST reconciliation and correction',
-      price: 3500,
-      category: 'GST_COMPLIANCE',
-      duration_days: 7,
-    },
-    {
-      ca_id: 'ca-user-001',
-      name: 'Accounting Support',
-      description: 'Monthly accounting and bookkeeping',
-      price: 8000,
-      category: 'ACCOUNTING',
-      duration_days: 5,
-    },
-  ];
-
-  await supabase.from('services').insert(services);
-}
-
-async function seedDocuments() {
-  const documents = [
-    {
-      client_id: 'client-001',
-      ca_id: 'ca-user-001',
-      file_name: 'GST_Preparation_March2024.pdf',
-      category: 'GST',
-      file_size: 2048000,
-      upload_date: '2024-03-31',
-      version: 1,
-      status: 'VERIFIED',
-    },
-    {
-      client_id: 'client-001',
-      ca_id: 'ca-user-001',
-      file_name: 'Bank_Statement_March2024.pdf',
-      category: 'BANK_STATEMENTS',
-      file_size: 1536000,
-      upload_date: '2024-03-28',
-      version: 1,
-      status: 'VERIFIED',
-    },
-    {
-      client_id: 'client-002',
-      ca_id: 'ca-user-001',
-      file_name: 'ITR_Supporting_Docs.pdf',
-      category: 'ITR',
-      file_size: 3072000,
-      upload_date: '2024-03-25',
-      version: 1,
-      status: 'VERIFIED',
-    },
-  ];
-
-  await supabase.from('documents').insert(documents);
-}
-
-async function seedInvoices() {
-  const invoices = [
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-001',
-      invoice_number: 'INV-2024-001',
-      amount: 50000,
-      gst_amount: 9000,
-      total_amount: 59000,
-      status: 'PAID',
-      issue_date: '2024-03-01',
-      due_date: '2024-03-15',
-      payment_date: '2024-03-12',
-    },
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-002',
-      invoice_number: 'INV-2024-002',
-      amount: 75000,
-      gst_amount: 13500,
-      total_amount: 88500,
-      status: 'PAID',
-      issue_date: '2024-03-05',
-      due_date: '2024-03-20',
-      payment_date: '2024-03-19',
-    },
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-003',
-      invoice_number: 'INV-2024-003',
-      amount: 60000,
-      gst_amount: 10800,
-      total_amount: 70800,
-      status: 'PENDING',
-      issue_date: '2024-04-01',
-      due_date: '2024-04-15',
-      payment_date: null,
-    },
-  ];
-
-  await supabase.from('invoices').insert(invoices);
-}
-
-async function seedTasks() {
-  const tasks = [
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-001',
-      title: 'Prepare GST Filing',
-      description: 'Prepare and file monthly GST return',
-      status: 'COMPLETED',
-      priority: 'HIGH',
-      due_date: '2024-03-31',
-      assigned_to: 'staff-001',
-    },
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-002',
-      title: 'Collect ITR Documents',
-      description: 'Collect all required ITR documents from client',
-      status: 'IN_PROGRESS',
-      priority: 'HIGH',
-      due_date: '2024-04-10',
-      assigned_to: 'staff-001',
-    },
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-003',
-      title: 'Review Financial Statements',
-      description: 'Review and verify financial statements',
-      status: 'PENDING',
-      priority: 'MEDIUM',
-      due_date: '2024-04-15',
-      assigned_to: null,
-    },
-  ];
-
-  await supabase.from('tasks').insert(tasks);
-}
-
-async function seedCompliance() {
-  const compliance = [
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-001',
-      item_name: 'GST Filing - March 2024',
-      item_type: 'GST_FILING',
-      status: 'COMPLETED',
-      due_date: '2024-03-31',
-      completed_date: '2024-03-31',
-      financial_year: '2023-24',
-    },
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-001',
-      item_name: 'TDS Filing - Q4 2023',
-      item_type: 'TDS_FILING',
-      status: 'PENDING',
-      due_date: '2024-06-30',
-      completed_date: null,
-      financial_year: '2023-24',
-    },
-  ];
-
-  await supabase.from('compliance_tracking').insert(compliance);
-}
-
-async function seedGSTITR() {
-  const gstData = [
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-001',
-      return_type: 'GSTR1',
-      filing_period: '2024-03',
-      status: 'FILED',
-      arn: 'ARN-123456789',
-      filing_date: '2024-03-31',
-      financial_year: '2023-24',
-    },
-  ];
-
-  const itrData = [
-    {
-      ca_id: 'ca-user-001',
-      client_id: 'client-001',
-      itr_type: 'ITR1',
-      filing_period: '2024',
-      status: 'DRAFT',
-      gross_income: 750000,
-      taxable_income: 500000,
-      tax_payable: 125000,
-      financial_year: '2023-24',
-    },
-  ];
-
-  await supabase.from('gst_filings').insert(gstData);
-  await supabase.from('itr_filings').insert(itrData);
-}
-
-async function seedWorkflows() {
-  const workflows = [
-    {
-      ca_id: 'ca-user-001',
-      name: 'Monthly GST Filing',
-      description: 'Automated monthly GST return filing',
-      trigger_type: 'SCHEDULED',
-      trigger_value: 'MONTHLY',
-      status: 'ACTIVE',
-      actions: [
-        { type: 'COLLECT_DOCUMENTS', order: 1 },
-        { type: 'VALIDATE_DATA', order: 2 },
-        { type: 'GENERATE_RETURN', order: 3 },
-      ],
-    },
-    {
-      ca_id: 'ca-user-001',
-      name: 'Document Expiry Alerts',
-      description: 'Alert for expiring documents',
-      trigger_type: 'SCHEDULED',
-      trigger_value: 'DAILY',
-      status: 'ACTIVE',
-      actions: [
-        { type: 'CHECK_EXPIRY', order: 1 },
-        { type: 'SEND_ALERT', order: 2 },
-      ],
-    },
-  ];
-
-  await supabase.from('workflows').insert(workflows);
+// If run directly
+if (require.main === module) {
+  seedDatabase()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 }

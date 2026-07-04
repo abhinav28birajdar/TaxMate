@@ -1,10 +1,5 @@
-# ============================================================================
-# GIT IGNORE - TaxMate Production Application
-# ============================================================================
 
-# ============================================================================
-# Dependencies & Package Manager
-# ============================================================================
+
 node_modules/
 .pnp
 .pnp.js
@@ -18,9 +13,7 @@ package-lock.json
 pnpm-lock.yaml
 yarn.lock
 
-# ============================================================================
-# Next.js Build & Runtime
-# ============================================================================
+
 .next/
 out/
 build/
@@ -97,6 +90,10 @@ tsconfig.tsbuildinfo
 *.db
 *.db-wal
 *.db-shm
+*.sql
+!supabase/schema.sql
+database/
+build.log
 # Note: Keep supabase/schema.sql, only ignore local migrations
 supabase/migrations/
 supabase/.test.sql

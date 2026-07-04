@@ -102,7 +102,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
           // Fetch user profile from database
           const { data: profileData, error: profileError } = await supabase
-            .from('users')
+            .from('profiles')
             .select('*')
             .eq('id', currentSession.user.id)
             .single();
@@ -113,24 +113,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const userProfile: UserProfile = {
               id: profileData.id,
               email: profileData.email,
-              name: profileData.name,
-              role: profileData.role as UserRole,
-              avatarUrl: profileData.avatarUrl,
-              status: profileData.status as AccountStatus,
-              onboardingCompleted: profileData.onboardingCompleted,
-              timezone: profileData.timezone,
-              lastLoginAt: profileData.lastLoginAt,
-              twoFactorEnabled: profileData.twoFactorEnabled,
+              name: profileData.full_name || '',
+              role: (profileData.role?.toUpperCase() || 'CLIENT') as UserRole,
+              avatarUrl: profileData.avatar_url || undefined,
+              status: profileData.is_active ? 'ACTIVE' : 'INACTIVE',
+              onboardingCompleted: profileData.is_verified || false,
+              timezone: 'Asia/Kolkata',
+              lastLoginAt: profileData.last_login_at || undefined,
+              twoFactorEnabled: profileData.two_factor_enabled || false,
             };
             setUser(userProfile);
             setRole(userProfile.role);
 
             // Update last login
             await supabase
-              .from('users')
-              .update({ lastLoginAt: new Date().toISOString() })
-              .eq('id', currentSession.user.id)
-              .throwOnError();
+              .from('profiles')
+              .update({ last_login_at: new Date().toISOString() })
+              .eq('id', currentSession.user.id);
           }
         }
 
@@ -155,7 +154,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(newSession);
         // Fetch fresh user profile
         const { data: profileData } = await supabase
-          .from('users')
+          .from('profiles')
           .select('*')
           .eq('id', newSession.user.id)
           .single();
@@ -164,14 +163,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const userProfile: UserProfile = {
             id: profileData.id,
             email: profileData.email,
-            name: profileData.name,
-            role: profileData.role as UserRole,
-            avatarUrl: profileData.avatarUrl,
-            status: profileData.status as AccountStatus,
-            onboardingCompleted: profileData.onboardingCompleted,
-            timezone: profileData.timezone,
-            lastLoginAt: profileData.lastLoginAt,
-            twoFactorEnabled: profileData.twoFactorEnabled,
+            name: profileData.full_name || '',
+            role: (profileData.role?.toUpperCase() || 'CLIENT') as UserRole,
+            avatarUrl: profileData.avatar_url || undefined,
+            status: profileData.is_active ? 'ACTIVE' : 'INACTIVE',
+            onboardingCompleted: profileData.is_verified || false,
+            timezone: 'Asia/Kolkata',
+            lastLoginAt: profileData.last_login_at || undefined,
+            twoFactorEnabled: profileData.two_factor_enabled || false,
           };
           setUser(userProfile);
           setRole(userProfile.role);
@@ -240,7 +239,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       try {
         // First check if user already exists (optional but good for UX)
         const { data: existingUser } = await supabase
-          .from('users')
+          .from('profiles')
           .select('id')
           .eq('email', email)
           .maybeSingle();
@@ -276,22 +275,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
 
-        // Create user profile in 'users' table if not handled by trigger
-        // This ensures the custom 'users' table stays in sync
-        if (data.user) {
-          const { error: profileError } = await supabase.from('users').insert({
-            id: data.user.id,
-            email,
-            name,
-            role: roleParam,
-            status: 'PENDING_VERIFICATION',
-            onboardingCompleted: false,
-          });
-
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-          }
-        }
+        // Profile is handled by database trigger (on_auth_user_created)
+        // No manual public.profiles insert is required here.
 
         toast.success('Registration successful! Please check your email for verification.');
         router.push('/verify-email');
@@ -362,11 +347,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!user) return;
 
       try {
+        const dbData: any = {};
+        if (data.name !== undefined) dbData.full_name = data.name;
+        if (data.avatarUrl !== undefined) dbData.avatar_url = data.avatarUrl;
+        if (data.timezone !== undefined) dbData.timezone = data.timezone;
+        if (data.twoFactorEnabled !== undefined) dbData.two_factor_enabled = data.twoFactorEnabled;
+
         const { error } = await supabase
-          .from('users')
-          .update(data)
-          .eq('id', user.id)
-          .throwOnError();
+          .from('profiles')
+          .update(dbData)
+          .eq('id', user.id);
 
         if (error) throw error;
 

@@ -926,6 +926,49 @@ export interface Database {
           updated_at?: string
         }
       }
+      message_read_receipts: {
+        Row: {
+          id: string
+          message_id: string
+          user_id: string
+          read_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          user_id: string
+          read_at?: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          user_id?: string
+          read_at?: string
+        }
+      }
+      typing_indicators: {
+        Row: {
+          id: string
+          conversation_id: string
+          user_id: string
+          is_typing: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          user_id: string
+          is_typing?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          user_id?: string
+          is_typing?: boolean
+          updated_at?: string
+        }
+      }
     }
   }
 }
