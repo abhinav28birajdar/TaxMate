@@ -15,7 +15,7 @@ import {
 
 interface ConfirmDialogProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description?: string;
   confirmLabel?: string;
@@ -38,7 +38,7 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const handleConfirm = async () => {
     await onConfirm();
-    onOpenChange(false);
+    onOpenChange?.(false);
   };
 
   return (

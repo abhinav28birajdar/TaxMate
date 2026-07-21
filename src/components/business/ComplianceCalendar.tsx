@@ -69,7 +69,7 @@ export default function ComplianceCalendar() {
     { id: 'tax', name: 'Tax', color: 'red' },
     { id: 'gst', name: 'GST/VAT', color: 'blue' },
     { id: 'company', name: 'Company Registration', color: 'green' },
-    { id: 'payroll', name: 'Payroll', color: 'yellow' },
+    { id: 'payroll', name: 'Payroll', color: 'amber' },
   ];
   
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -131,7 +131,7 @@ export default function ComplianceCalendar() {
     const daysDiff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
     if (daysDiff <= 14) {
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
     }
     
     return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';

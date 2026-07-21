@@ -155,16 +155,16 @@ export const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
     ACTIVE: 'bg-green-100 text-green-800',
     INACTIVE: 'bg-gray-100 text-gray-800',
-    PENDING: 'bg-yellow-100 text-yellow-800',
+    PENDING: 'bg-amber-100 text-amber-800',
     COMPLETED: 'bg-blue-100 text-blue-800',
     FAILED: 'bg-red-100 text-red-800',
     DRAFT: 'bg-gray-100 text-gray-800',
     SENT: 'bg-blue-100 text-blue-800',
-    PAID: 'bg-green-100 text-green-800',
+    PAID: 'bg-lime-100 text-lime-800',
     OVERDUE: 'bg-red-100 text-red-800',
     TODO: 'bg-gray-100 text-gray-800',
     IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    IN_REVIEW: 'bg-yellow-100 text-yellow-800',
+    IN_REVIEW: 'bg-amber-100 text-amber-800',
     DONE: 'bg-green-100 text-green-800',
   }
   return colors[status] || 'bg-gray-100 text-gray-800'

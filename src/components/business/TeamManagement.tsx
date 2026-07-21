@@ -203,7 +203,7 @@ export default function TeamManagement() {
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                             member.status === 'active' 
                               ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                              : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                              : 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
                           }`}>
                             {member.status}
                           </span>
@@ -271,7 +271,7 @@ export default function TeamManagement() {
                     <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Team Member</h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Basic access to view documents and appointments</p>
                   </div>
-                  <div className="text-xs text-yellow-500 font-medium">Limited Access</div>
+                  <div className="text-xs text-amber-500 font-medium">Limited Access</div>
                 </div>
               </div>
               

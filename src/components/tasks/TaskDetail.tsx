@@ -6,8 +6,8 @@ import { Edit, Trash2, Plus, AlertCircle, Clock, User, FileText } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import StatusBadge from '@/components/shared/StatusBadge';
+import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import SubtaskItem from './details/SubtaskItem';
 import {
   DropdownMenu,

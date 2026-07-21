@@ -64,7 +64,7 @@ export function ITRDashboard() {
       return <Badge className="bg-red-500">Overdue</Badge>;
     }
     if (due.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000) {
-      return <Badge className="bg-yellow-500">Due Soon</Badge>;
+      return <Badge className="bg-amber-500">Due Soon</Badge>;
     }
     return <Badge className="bg-gray-500">Pending</Badge>;
   };

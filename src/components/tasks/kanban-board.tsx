@@ -23,7 +23,7 @@ const COLUMNS = [
 const PRIORITY_CONFIG = {
     URGENT: { label: 'Urgent', class: 'bg-red-100 text-red-700' },
     HIGH: { label: 'High', class: 'bg-orange-100 text-orange-700' },
-    MEDIUM: { label: 'Medium', class: 'bg-yellow-100 text-yellow-700' },
+    MEDIUM: { label: 'Medium', class: 'bg-amber-100 text-amber-700' },
     LOW: { label: 'Low', class: 'bg-gray-100 text-gray-600' },
 };
 

@@ -6,7 +6,7 @@ import { Clock, Users, MapPin, Video, Phone, FileText, Edit, Trash2 } from 'luci
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -253,7 +253,7 @@ export default function AppointmentCard({
                   <span className="text-xs text-slate-500">
                     {attendee.role === 'organizer' ? '👤 Organizer' : attendee.role === 'optional' ? '❓ Optional' : 'Attendee'}
                   </span>
-                </p>
+                </div>
               ))}
             </div>
           </div>

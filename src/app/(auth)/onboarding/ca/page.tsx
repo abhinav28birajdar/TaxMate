@@ -626,7 +626,7 @@ export default function CAOnboardingPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-start gap-3 p-4 bg-yellow-50 text-yellow-800 rounded-lg text-sm">
+                                <div className="flex items-start gap-3 p-4 bg-amber-50 text-amber-800 rounded-lg text-sm">
                                     <CheckCircle className="w-5 h-5 shrink-0" />
                                     <p>
                                         By submitting, you confirm that all provided details are accurate.

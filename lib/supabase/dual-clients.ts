@@ -17,8 +17,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Permissive database type for flexibility
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 type AnyDatabase = any;
 
 // Type for analytics database (can be extended)

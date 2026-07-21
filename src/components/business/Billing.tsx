@@ -117,7 +117,7 @@ export default function Billing({}: BillingProps) {
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                   subscription.status === 'active' 
                     ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
                 }`}>
                   {subscription.status === 'active' ? 'Active' : 'Inactive'}
                 </span>
@@ -356,7 +356,7 @@ export default function Billing({}: BillingProps) {
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         invoice.status === 'paid'
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
                       }`}>
                         {invoice.status === 'paid' ? 'Paid' : 'Pending'}
                       </span>

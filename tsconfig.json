@@ -24,7 +24,8 @@
     ],
     "paths": {
       "@/*": [
-        "./src/*"
+        "./src/*",
+        "./lib/*"
       ],
       "@lib/*": [
         "./lib/*"
@@ -41,6 +42,7 @@
   "exclude": [
     "node_modules",
     "prisma/**/*.ts",
-    "server/**/*.ts"
+    "server/**/*.ts",
+    "supabase/**/*.ts"
   ]
 }

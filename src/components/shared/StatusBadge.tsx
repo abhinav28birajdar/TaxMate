@@ -4,9 +4,10 @@ import { cn } from '@/lib/utils';
 type StatusType = 
   | 'not_started' | 'in_progress' | 'review' | 'completed' | 'cancelled'
   | 'draft' | 'sent' | 'paid' | 'overdue'
-  | 'pending' | 'filed'
+  | 'pending' | 'filed' | 'rejected'
   | 'active' | 'inactive' | 'prospect'
-  | 'scheduled' | 'confirmed' | 'no_show';
+  | 'scheduled' | 'confirmed' | 'no_show'
+  | string;
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -31,6 +32,7 @@ const statusConfig: Record<StatusType, { label: string; bg: string; text: string
   // Compliance statuses
   pending: { label: 'Pending', bg: 'bg-slate-100', text: 'text-slate-700' },
   filed: { label: 'Filed', bg: 'bg-lime-100', text: 'text-lime-700' },
+  rejected: { label: 'Rejected', bg: 'bg-red-100', text: 'text-red-700' },
 
   // Client statuses
   active: { label: 'Active', bg: 'bg-lime-100', text: 'text-lime-700' },

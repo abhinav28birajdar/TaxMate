@@ -1219,6 +1219,54 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.ca_firms;
 -- SEED DATA
 -- ============================================================================
 
+-- System Settings Table
+CREATE TABLE IF NOT EXISTS public.system_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  description TEXT,
+  updated_by UUID REFERENCES public.users(id),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY system_settings_read ON public.system_settings FOR SELECT USING (true);
+CREATE POLICY system_settings_admin ON public.system_settings FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE users.id = auth.uid() AND users.role = 'SUPER_ADMIN'::user_role
+  )
+);
+
+-- Maintenance Subscribers Table
+CREATE TABLE IF NOT EXISTS public.maintenance_subscribers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email TEXT UNIQUE NOT NULL,
+  subscribed_at TIMESTAMPTZ DEFAULT NOW(),
+  notified_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.maintenance_subscribers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY maintenance_subscribers_insert ON public.maintenance_subscribers FOR INSERT WITH CHECK (true);
+CREATE POLICY maintenance_subscribers_admin ON public.maintenance_subscribers FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE users.id = auth.uid() AND users.role = 'SUPER_ADMIN'::user_role
+  )
+);
+
+-- Seed System Settings
+INSERT INTO public.system_settings (key, value, description) VALUES
+  ('maintenance_mode', 'false', 'Enable or disable global maintenance mode'),
+  ('maintenance_message', 'We are performing scheduled maintenance. We will be back shortly.', 'Message shown on maintenance screen'),
+  ('maintenance_bypass_key', '', 'Secret key to bypass maintenance mode'),
+  ('maintenance_estimated_end', '', 'Estimated end time ISO timestamp'),
+  ('maintenance_schedule_start', '', 'Scheduled maintenance start time ISO timestamp'),
+  ('maintenance_schedule_end', '', 'Scheduled maintenance end time ISO timestamp'),
+  ('app_version', '1.0.0', 'Current TaxMate application version'),
+  ('default_subscription_plan', 'free', 'Default subscription tier for new firms')
+ON CONFLICT (key) DO NOTHING;
+
 INSERT INTO public.users (id, email, password_hash, name, role, status, onboarding_completed)
 VALUES 
   ('d3b07384-d113-4956-a534-7c24434ff601', 'admin@taxmate.com', '$2a$12$R.S4wI23YfD4NzeA7pM5fO1g6H77WlGkO/v82iKqJm8V8yW064cQO', 'System Admin', 'SUPER_ADMIN', 'ACTIVE', TRUE)

@@ -47,15 +47,17 @@ interface NavSection {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, signOut, organization } = useAuth();
+  const auth: any = useAuth();
+  const { user, signOut, organization } = auth;
   const [collapsed, setCollapsed] = useState(false);
 
   // Determine nav sections based on user role
   const getNavSections = (): NavSection[] => {
-    const isAdmin = user?.role === 'super_admin';
-    const isCA = user?.role === 'ca';
-    const isStaff = user?.role === 'staff';
-    const isClient = user?.role === 'client';
+    const role = user?.role ? String(user.role).toLowerCase() : '';
+    const isAdmin = role === 'super_admin';
+    const isCA = role === 'ca';
+    const isStaff = role === 'staff';
+    const isClient = role === 'client';
 
     if (isClient) {
       return [
@@ -214,7 +216,7 @@ export default function Sidebar() {
             <DropdownMenuItem asChild>
               <Link href="/dashboard/settings/profile">Profile Settings</Link>
             </DropdownMenuItem>
-            {(user?.role === 'super_admin' || user?.role === 'ca') && (
+            {(String(user?.role).toLowerCase() === 'super_admin' || String(user?.role).toLowerCase() === 'ca') && (
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/settings/organization">Organization</Link>
               </DropdownMenuItem>

@@ -47,7 +47,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.C
     filed: { label: 'RETURN FILED', color: 'bg-blue-500/10 text-blue-400 border-blue-400/20', icon: Clock },
     processed: { label: 'PROCESSED', color: 'bg-purple-500/10 text-purple-400 border-purple-400/20', icon: FileSearch },
     rectification: { label: 'RECTIFICATION REQ', color: 'bg-red-500/10 text-red-400 border-red-400/20', icon: AlertCircle },
-    refund_issued: { label: 'REFUND ISSUED', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-400/20', icon: CheckCircle2 },
+    refund_issued: { label: 'REFUND ISSUED', color: 'bg-amber-500/10 text-amber-400 border-amber-400/20', icon: CheckCircle2 },
     refund_credited: { label: 'REFUND CREDITED', color: 'bg-primary/20 text-primary border-primary/20', icon: CheckCircle },
     adjusted: { label: 'ADJUSTED', color: 'bg-orange-500/10 text-orange-400 border-orange-400/20', icon: TrendingUp },
     delayed: { label: 'DELAYED', color: 'bg-zinc-500/10 text-zinc-400 border-zinc-400/20', icon: Clock },

@@ -6,7 +6,7 @@ import { FileText, Download, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { StatusBadge } from '@/components/shared/StatusBadge';
+import StatusBadge from '@/components/shared/StatusBadge';
 import { cn } from '@/lib/utils';
 
 interface LineItem {

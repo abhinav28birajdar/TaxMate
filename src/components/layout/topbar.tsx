@@ -1,51 +1,89 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/hooks/UnifiedAuthContext';
-import Link from 'next/link';
+import { Bell, Search, Menu } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "./ThemeToggle";
 
-export default function TopBar() {
-  const { user, signOut } = useAuth();
-
+export function TopBar() {
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
-        {/* Search */}
-        <div className="flex-1 max-w-md">
-          <input
-            type="text"
-            placeholder="Search clients, documents, tasks..."
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+      <Button variant="ghost" size="icon" className="-m-2.5 p-2.5 text-muted-foreground lg:hidden">
+        <span className="sr-only">Open sidebar</span>
+        <Menu className="h-6 w-6" aria-hidden="true" />
+      </Button>
+
+      {/* Separator for mobile */}
+      <div className="h-6 w-px bg-border lg:hidden" aria-hidden="true" />
+
+      <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
+        <form className="relative flex flex-1" action="#" method="GET">
+          <label htmlFor="search-field" className="sr-only">
+            Search
+          </label>
+          <Search
+            className="pointer-events-none absolute inset-y-0 left-0 h-full w-5 text-muted-foreground"
+            aria-hidden="true"
           />
-        </div>
+          <Input
+            id="search-field"
+            className="block h-full w-full border-0 bg-transparent py-0 pl-8 pr-0 text-foreground placeholder:text-muted-foreground focus-visible:ring-0 sm:text-sm shadow-none"
+            placeholder="Search clients, tasks, or documents..."
+            type="search"
+            name="search"
+          />
+        </form>
+        <div className="flex items-center gap-x-4 lg:gap-x-6">
+          <ThemeToggle />
+          
+          <Button variant="ghost" size="icon" className="-m-2.5 p-2.5 text-muted-foreground hover:text-foreground relative">
+            <span className="sr-only">View notifications</span>
+            <Bell className="h-6 w-6" aria-hidden="true" />
+            <span className="absolute top-2 right-2 flex h-2 w-2 rounded-full bg-primary" />
+          </Button>
 
-        {/* Right Section */}
-        <div className="flex items-center gap-6 ml-6">
-          {/* Notifications */}
-          <button className="relative text-gray-600 hover:text-gray-900 transition">
-            <span className="text-2xl">🔔</span>
-            <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          {/* Separator */}
+          <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-border" aria-hidden="true" />
 
-          {/* Profile */}
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="font-medium text-gray-900">{user?.name || user?.email || 'User'}</p>
-              <p className="text-sm text-gray-600 capitalize">{user?.role?.toLowerCase()}</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
-              {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
-            </div>
-          </div>
-
-          {/* Logout */}
-          <button
-            onClick={signOut}
-            className="text-sm text-gray-600 hover:text-gray-900 transition"
-          >
-            ↪️
-          </button>
+          {/* Profile dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="-m-1.5 flex items-center p-1.5 hover:bg-transparent">
+                <span className="sr-only">Open user menu</span>
+                <Avatar className="h-8 w-8 bg-primary/10 border border-primary/20">
+                  <AvatarImage src="" alt="" />
+                  <AvatarFallback className="text-primary font-medium">CA</AvatarFallback>
+                </Avatar>
+                <span className="hidden lg:flex lg:items-center">
+                  <span className="ml-4 text-sm font-semibold leading-6 text-foreground" aria-hidden="true">
+                    Tom Cook
+                  </span>
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 mt-2">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Profile Settings</DropdownMenuItem>
+              <DropdownMenuItem>Billing</DropdownMenuItem>
+              <DropdownMenuItem>Team</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive">Log out</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-    </div>
+    </header>
   );
 }
+
+export default TopBar;

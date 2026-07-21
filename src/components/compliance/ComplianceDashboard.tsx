@@ -54,7 +54,7 @@ export const ComplianceDashboard = () => {
   const getStatusBadgeColor = (status: string, daysUntilDue: number): string => {
     if (daysUntilDue < 0) return 'bg-red-100 text-red-800';
     if (daysUntilDue === 0) return 'bg-orange-100 text-orange-800';
-    if (daysUntilDue <= 3) return 'bg-yellow-100 text-yellow-800';
+    if (daysUntilDue <= 3) return 'bg-amber-100 text-amber-800';
     return 'bg-green-100 text-green-800';
   };
 
@@ -71,7 +71,7 @@ export const ComplianceDashboard = () => {
           <div className="text-gray-600">Total Deadlines</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-3xl font-bold text-yellow-600">{stats.pending}</div>
+          <div className="text-3xl font-bold text-amber-600">{stats.pending}</div>
           <div className="text-gray-600">Pending</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow">

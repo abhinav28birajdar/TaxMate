@@ -196,9 +196,9 @@ export default function CADashboard() {
         </Card>
 
         {/* Average Rating */}
-        <Card className="p-6 bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border-yellow-200 dark:border-yellow-800">
+        <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center">
               <Star className="w-6 h-6 text-white fill-current" />
             </div>
             <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
@@ -206,9 +206,9 @@ export default function CADashboard() {
               +{stats.ratingChange}
             </Badge>
           </div>
-          <h3 className="text-sm font-medium text-yellow-600 dark:text-yellow-400 mb-1">Average Rating</h3>
-          <p className="text-3xl font-bold text-yellow-900 dark:text-yellow-100">{stats.avgRating}</p>
-          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">From 89 reviews</p>
+          <h3 className="text-sm font-medium text-amber-600 dark:text-amber-400 mb-1">Average Rating</h3>
+          <p className="text-3xl font-bold text-amber-900 dark:text-amber-100">{stats.avgRating}</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">From 89 reviews</p>
         </Card>
       </div>
 

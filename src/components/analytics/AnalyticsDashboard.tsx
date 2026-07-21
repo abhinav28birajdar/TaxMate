@@ -90,7 +90,7 @@ export const AnalyticsDashboard = () => {
             <p className="text-gray-600 text-sm">Average Rating</p>
             <p className="text-3xl font-bold mt-2">{metrics.averageRating.toFixed(1)}</p>
           </div>
-          <div className="text-4xl text-yellow-400">⭐</div>
+          <div className="text-4xl text-amber-400">⭐</div>
         </div>
       </div>
 

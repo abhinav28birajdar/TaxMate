@@ -42,7 +42,7 @@ export const RecommendationsWidget = () => {
     const colors: Record<string, string> = {
       critical: 'bg-red-100 text-red-800 border-l-4 border-red-500',
       high: 'bg-orange-100 text-orange-800 border-l-4 border-orange-500',
-      medium: 'bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500',
+      medium: 'bg-amber-100 text-amber-800 border-l-4 border-amber-500',
       low: 'bg-blue-100 text-blue-800 border-l-4 border-blue-500',
     };
     return colors[priority] || colors['low'];

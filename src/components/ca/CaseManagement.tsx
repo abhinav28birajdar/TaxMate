@@ -55,7 +55,7 @@ const CASE_TYPES = [
 
 const STATUS_CONFIG = {
     draft: { label: 'Draft', color: 'bg-gray-500', icon: FileText },
-    pending_documents: { label: 'Pending Documents', color: 'bg-yellow-500', icon: Clock },
+    pending_documents: { label: 'Pending Documents', color: 'bg-amber-500', icon: Clock },
     in_progress: { label: 'In Progress', color: 'bg-primary', icon: Briefcase },
     under_review: { label: 'Under Review', color: 'bg-purple-600', icon: AlertCircle },
     filed: { label: 'Filed', color: 'bg-green-600', icon: CheckCircle },
@@ -217,7 +217,7 @@ export default function CaseManagement() {
                                 {cases.filter(c => c.status === 'in_progress').length}
                             </p>
                         </div>
-                        <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
+                        <div className="w-12 h-12 bg-amber-500 rounded-lg flex items-center justify-center">
                             <Clock className="w-6 h-6 text-white" />
                         </div>
                     </div>
@@ -367,17 +367,17 @@ export default function CaseManagement() {
 
                             {/* Due Date */}
                             <div className={`flex items-center gap-2 p-3 rounded-lg ${isOverdue ? 'bg-red-50 dark:bg-red-900/20' :
-                                    isDueSoon ? 'bg-yellow-50 dark:bg-yellow-900/20' :
+                                    isDueSoon ? 'bg-amber-50 dark:bg-amber-900/20' :
                                         'bg-gray-50 dark:bg-gray-800'
                                 }`}>
                                 <Calendar className={`w-4 h-4 ${isOverdue ? 'text-red-600' :
-                                        isDueSoon ? 'text-yellow-600' :
+                                        isDueSoon ? 'text-amber-600' :
                                             'text-gray-600'
                                     }`} />
                                 <div className="flex-1">
                                     <p className="text-xs text-gray-600 dark:text-gray-400">Due Date</p>
                                     <p className={`text-sm font-semibold ${isOverdue ? 'text-red-600' :
-                                            isDueSoon ? 'text-yellow-600' :
+                                            isDueSoon ? 'text-amber-600' :
                                                 'text-gray-900 dark:text-white'
                                         }`}>
                                         {formatDate(caseItem.dueDate)}

@@ -36,7 +36,8 @@ interface HeaderProps {
 }
 
 export default function Header({ title, subtitle, showSearch = true }: HeaderProps) {
-  const { user, signOut, notifications } = useAuth();
+  const auth: any = useAuth();
+  const { user, signOut, notifications } = auth;
   const { theme, setTheme } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);

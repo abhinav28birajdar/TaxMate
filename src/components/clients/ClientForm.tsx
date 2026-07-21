@@ -39,6 +39,8 @@ interface ClientFormProps {
   onSubmit: (data: ClientFormData) => Promise<void>;
   isLoading?: boolean;
   submitLabel?: string;
+  title?: string;
+  subtitle?: string;
 }
 
 export default function ClientForm({

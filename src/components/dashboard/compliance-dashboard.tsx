@@ -94,7 +94,7 @@ export function ComplianceDashboard() {
       case 'overdue':
         return <AlertTriangle className="w-5 h-5 text-red-500" />;
       default:
-        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
+        return <AlertCircle className="w-5 h-5 text-amber-500" />;
     }
   };
 
@@ -257,10 +257,10 @@ export function ComplianceDashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-yellow-500" />
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
                   <span className="text-sm text-gray-600">Pending</span>
                 </div>
-                <span className="text-lg font-bold text-yellow-600">{stats.pending}</span>
+                <span className="text-lg font-bold text-amber-600">{stats.pending}</span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
