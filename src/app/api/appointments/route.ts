@@ -9,6 +9,8 @@ import { validateInput, RequestSchemas } from '@/lib/api/validation';
 import { createAppointmentRecord } from '@/lib/api/db-operations';
 import { ApiError, HTTP_STATUS } from '@/lib/api/response';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   return handleApiRequest(
     request,

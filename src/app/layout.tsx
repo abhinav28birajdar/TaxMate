@@ -1,16 +1,9 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { AuthProvider } from "@/hooks/UnifiedAuthContext";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/theme/theme-provider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
   title: "TaxMate - Professional Tax & Accounting Management Platform",
@@ -28,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased bg-background text-foreground">
         <ErrorBoundary>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
             <AuthProvider>
@@ -43,4 +36,3 @@ export default function RootLayout({
     </html>
   );
 }
-

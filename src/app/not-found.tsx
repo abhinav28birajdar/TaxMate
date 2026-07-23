@@ -1,64 +1,71 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Home, ChevronLeft } from 'lucide-react';
+import { ShieldAlert, Home, ChevronLeft, LayoutDashboard, Search, Users } from 'lucide-react';
 
 export default function NotFoundPage() {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
-      <div className="max-w-md w-full text-center space-y-8">
-        {/* Icon */}
+    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-lime-600/10 via-slate-900 to-slate-950 pointer-events-none" />
+
+      <div className="max-w-xl w-full text-center space-y-8 relative z-10 bg-slate-800/60 border border-slate-700/60 p-8 sm:p-12 rounded-3xl backdrop-blur-xl shadow-2xl">
         <div className="flex justify-center">
-          <div className="relative">
-            <div className="absolute inset-0 bg-red-500/20 blur-xl rounded-full animate-pulse" />
-            <div className="relative bg-red-500/10 border border-red-500/30 rounded-full p-6">
-              <AlertTriangle className="h-16 w-16 text-red-500 mx-auto" />
-            </div>
+          <div className="w-20 h-20 bg-lime-600/20 text-lime-400 rounded-2xl flex items-center justify-center border border-lime-500/30 shadow-lg shadow-lime-600/20">
+            <ShieldAlert className="h-10 w-10" />
           </div>
         </div>
 
-        {/* Content */}
-        <div className="space-y-4">
-          <h1 className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-red-600 italic">
-            404
-          </h1>
-          <h2 className="text-3xl font-bold text-white italic">Page Not Found</h2>
-          <p className="text-lg text-slate-400">
-            The page you're looking for doesn't exist or has been moved.
+        <div className="space-y-3">
+          <span className="px-3 py-1 bg-lime-600/20 text-lime-400 text-xs font-bold rounded-full border border-lime-500/30 uppercase tracking-widest">
+            HTTP 404 Error
+          </span>
+          <h1 className="text-4xl font-extrabold text-white">Page Not Found</h1>
+          <p className="text-sm text-slate-400 max-w-md mx-auto">
+            The requested page or document does not exist, has been moved, or requires specific portal authorization.
           </p>
         </div>
 
-        {/* CTA Buttons */}
-        <div className="flex gap-3 justify-center pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <Link href="/ca/dashboard" className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-left transition-all group">
+            <div className="flex items-center justify-between text-xs font-bold text-white">
+              <span>CA Practice Portal</span>
+              <LayoutDashboard className="w-4 h-4 text-lime-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Clients, Returns & Tax Filings</p>
+          </Link>
+
+          <Link href="/client/dashboard" className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-left transition-all group">
+            <div className="flex items-center justify-between text-xs font-bold text-white">
+              <span>Client Tax Portal</span>
+              <Users className="w-4 h-4 text-lime-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Upload Documents & Tax Profile</p>
+          </Link>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-slate-700/60">
           <Button
             variant="outline"
-            size="lg"
             onClick={() => router.back()}
-            className="border-slate-600 text-slate-300 hover:bg-slate-700 rounded-none font-bold uppercase tracking-widest"
+            className="border-slate-700 text-slate-300 hover:bg-slate-800 rounded-xl font-semibold text-xs"
           >
-            <ChevronLeft className="mr-2 h-4 w-4" />
+            <ChevronLeft className="mr-1.5 h-4 w-4" />
             Go Back
           </Button>
           <Button
-            size="lg"
-            onClick={() => router.push('/dashboard')}
-            className="bg-primary hover:bg-primary/90 text-black rounded-none font-bold uppercase tracking-widest"
+            onClick={() => router.push('/')}
+            className="bg-lime-600 hover:bg-lime-500 text-white font-semibold rounded-xl text-xs shadow-md shadow-lime-600/20"
           >
-            <Home className="mr-2 h-4 w-4" />
-            Go Home
+            <Home className="mr-1.5 h-4 w-4" />
+            Return to Homepage
           </Button>
-        </div>
-
-        {/* Footer Text */}
-        <div className="pt-8 border-t border-slate-700/50">
-          <p className="text-xs text-slate-500 uppercase tracking-[0.2em] font-bold">
-            Error Code: 404 | Not Found
-          </p>
         </div>
       </div>
     </div>
   );
 }
+

@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server';
 import { requestPasswordResetSchema } from '@/lib/validators/auth';
 import { generateVerificationToken, sendPasswordResetEmail, createAuditLog } from '@/lib/auth-service';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
