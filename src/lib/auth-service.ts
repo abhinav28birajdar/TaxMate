@@ -6,7 +6,12 @@ import { Resend } from 'resend';
 import * as otpauth from 'otpauth';
 import QRCode from 'qrcode';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Safe lazy Resend client getter to prevent build errors when RESEND_API_KEY is not set
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY || 're_mock_key_for_build';
+  return new Resend(apiKey);
+}
+
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 );
@@ -66,6 +71,12 @@ export async function sendVerificationEmail(
   verificationLink: string
 ): Promise<boolean> {
   try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log(`[Simulated Email] Verification link for ${email}: ${verificationLink}`);
+      return true;
+    }
+
+    const resend = getResendClient();
     const response = await resend.emails.send({
       from: 'Taxmate <noreply@taxmate.in>',
       to: email,
@@ -74,7 +85,7 @@ export async function sendVerificationEmail(
         <h2>Welcome to Taxmate, ${name}!</h2>
         <p>Please verify your email to activate your account.</p>
         <p>
-          <a href="${verificationLink}" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+          <a href="${verificationLink}" style="background-color: #65a30d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
             Verify Email
           </a>
         </p>
@@ -98,6 +109,12 @@ export async function sendPasswordResetEmail(
   resetLink: string
 ): Promise<boolean> {
   try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log(`[Simulated Email] Password reset link for ${email}: ${resetLink}`);
+      return true;
+    }
+
+    const resend = getResendClient();
     const response = await resend.emails.send({
       from: 'Taxmate <noreply@taxmate.in>',
       to: email,
@@ -107,12 +124,11 @@ export async function sendPasswordResetEmail(
         <p>Hi ${name},</p>
         <p>We received a request to reset your password. Click the link below to create a new password.</p>
         <p>
-          <a href="${resetLink}" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+          <a href="${resetLink}" style="background-color: #65a30d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
             Reset Password
           </a>
         </p>
         <p style="color: #666; font-size: 12px;">This link expires in 1 hour.</p>
-        <p style="color: #999; font-size: 12px;">If you didn't request this, ignore this email.</p>
       `,
     });
 
@@ -132,6 +148,12 @@ export async function sendOTPEmail(
   otp: string
 ): Promise<boolean> {
   try {
+    if (!process.env.RESEND_API_KEY) {
+      console.log(`[Simulated OTP Email] OTP for ${email}: ${otp}`);
+      return true;
+    }
+
+    const resend = getResendClient();
     const response = await resend.emails.send({
       from: 'Taxmate <noreply@taxmate.in>',
       to: email,
@@ -140,7 +162,7 @@ export async function sendOTPEmail(
         <h2>Verification Code</h2>
         <p>Hi ${name},</p>
         <p>Your verification code is:</p>
-        <h3 style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #4F46E5;">${otp}</h3>
+        <h3 style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #65a30d;">${otp}</h3>
         <p style="color: #666; font-size: 12px;">This code expires in 10 minutes.</p>
       `,
     });
@@ -157,7 +179,6 @@ export async function sendOTPEmail(
  */
 export async function setup2FA(email: string): Promise<{ secret: string; qrCode: string } | null> {
   try {
-    // Generate TOTP secret
     const totp = new otpauth.TOTP({
       issuer: 'Taxmate',
       label: email,
@@ -169,7 +190,6 @@ export async function setup2FA(email: string): Promise<{ secret: string; qrCode:
     const secret = totp.secret.base32;
     const uri = totp.toString();
 
-    // Generate QR code
     const qrCode = await QRCode.toDataURL(uri);
 
     return { secret, qrCode };
@@ -193,7 +213,6 @@ export function verify2FAToken(secret: string, token: string): boolean {
       secret: otpauth.Secret.fromBase32(secret),
     });
 
-    // Allow for time skew (±30 seconds = 1 window)
     return totp.validate({ token, window: 1 }) !== null;
   } catch (error) {
     console.error('Failed to verify 2FA token:', error);
@@ -244,12 +263,10 @@ export async function validateUserSession(sessionToken: string) {
     return null;
   }
 
-  // Check if session is revoked
   if (!data.active) {
     return null;
   }
 
-  // Check if session is expired
   if (new Date(data.expires_at) < new Date()) {
     return null;
   }
@@ -314,14 +331,10 @@ export async function createAuditLog(
  * Auth Service Object - OTP Management
  */
 export const authService = {
-  /**
-   * Send OTP to user email
-   */
   async sendOTP(email: string): Promise<{ success: boolean; message: string }> {
     try {
       const supabase = await createClient();
 
-      // Get user
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, name, email')
@@ -332,11 +345,9 @@ export const authService = {
         throw new Error('User not found');
       }
 
-      // Generate OTP
       const otp = generateOTP();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Store OTP in verification_tokens table
       const { error: tokenError } = await supabase
         .from('verification_tokens')
         .insert({
@@ -350,13 +361,11 @@ export const authService = {
         throw new Error('Failed to generate OTP');
       }
 
-      // Send OTP email
       const emailSent = await sendOTPEmail(email, userData.name, otp);
       if (!emailSent) {
         throw new Error('Failed to send OTP email');
       }
 
-      // Log action
       await createAuditLog(userData.id, 'OTP_SENT', 'AUTH');
 
       return { success: true, message: 'OTP sent to email' };
@@ -366,14 +375,10 @@ export const authService = {
     }
   },
 
-  /**
-   * Verify OTP and return auth token
-   */
   async verifyOTP(email: string, otp: string): Promise<{ user: any; token: string }> {
     try {
       const supabase = await createClient();
 
-      // Get user
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
@@ -384,7 +389,6 @@ export const authService = {
         throw new Error('User not found');
       }
 
-      // Verify OTP
       const { data: tokenData, error: tokenError } = await supabase
         .from('verification_tokens')
         .select('*')
@@ -397,17 +401,14 @@ export const authService = {
         throw new Error('Invalid OTP');
       }
 
-      // Check if token is expired
       if (new Date(tokenData.expires_at) < new Date()) {
         throw new Error('OTP has expired');
       }
 
-      // Check if token is already used
       if (tokenData.used) {
         throw new Error('OTP has already been used');
       }
 
-      // Mark OTP as used
       const { error: updateError } = await supabase
         .from('verification_tokens')
         .update({ used: true, used_at: new Date().toISOString() })
@@ -417,19 +418,15 @@ export const authService = {
         throw new Error('Failed to verify OTP');
       }
 
-      // Generate JWT token
       const token = await generateJWT({ userId: userData.id, email: userData.email });
 
-      // Create session
       const sessionToken = await createUserSession(userData.id);
       if (!sessionToken) {
         throw new Error('Failed to create session');
       }
 
-      // Log action
       await createAuditLog(userData.id, 'OTP_VERIFIED', 'AUTH');
 
-      // Return user without sensitive data
       const { password_hash, two_factor_secret, ...safeUser } = userData;
 
       return { user: safeUser, token };
