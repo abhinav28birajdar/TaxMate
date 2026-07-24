@@ -371,9 +371,38 @@ export function useMultipleRealtimeSubscriptions(
     onDelete?: (record: any) => void;
   }>
 ) {
-  const results = subscriptions.map((sub) =>
-    useRealtimeSubscription(sub.table, sub.filter, sub.onInsert, sub.onUpdate, sub.onDelete)
-  );
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
-  return results.every((r) => r === true);
+  useEffect(() => {
+    if (!subscriptions || subscriptions.length === 0) return;
+    const supabase = createClient();
+    const channels = subscriptions.map((sub) => {
+      return supabase
+        .channel(`multi-${sub.table}-${sub.filter || 'all'}-${Math.random()}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: sub.table, ...(sub.filter && { filter: sub.filter }) },
+          (payload) => sub.onInsert?.(payload.new)
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: sub.table, ...(sub.filter && { filter: sub.filter }) },
+          (payload) => sub.onUpdate?.(payload.new)
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: sub.table, ...(sub.filter && { filter: sub.filter }) },
+          (payload) => sub.onDelete?.(payload.old)
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') setIsSubscribed(true);
+        });
+    });
+
+    return () => {
+      channels.forEach((ch) => supabase.removeChannel(ch));
+    };
+  }, [JSON.stringify(subscriptions.map(s => `${s.table}:${s.filter}`))]);
+
+  return isSubscribed;
 }

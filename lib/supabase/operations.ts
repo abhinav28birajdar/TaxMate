@@ -28,7 +28,7 @@ interface OperationResult<T = undefined> {
 }
 
 // Type helper to bypass outdated database types
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line
 type AnyTable = any;
 
 /**
