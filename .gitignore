@@ -91,6 +91,7 @@ tsconfig.tsbuildinfo
 *.db-wal
 *.db-shm
 *.sql
+*.SQL
 !supabase/schema.sql
 database/
 build.log
@@ -219,3 +220,4 @@ VERCEL_DEPLOYMENT_GUIDE.md
 # Local scripts & verification utilities
 verify-auth-system.sh
 
+.supabase/

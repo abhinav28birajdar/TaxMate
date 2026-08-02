@@ -8,7 +8,7 @@ import { logActivity } from './audit'
 let _supabaseAdmin: any = null;
 const getSupabaseAdmin = () => {
   if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+    _supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '');
   }
   return _supabaseAdmin;
 };

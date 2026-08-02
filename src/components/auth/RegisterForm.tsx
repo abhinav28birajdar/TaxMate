@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
+import { useAuth, type UserRole } from '@/hooks/UnifiedAuthContext';
 
 const registerSchema = z.object({
   role: z.enum(['client', 'ca', 'firm_admin']),
@@ -39,13 +39,12 @@ export function RegisterForm({ initialRole = 'client' }: { initialRole?: 'client
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Read role from query param or prop
+  const { signUp } = useAuth();
+
   const paramRole = searchParams.get('role') as 'client' | 'ca' | 'firm_admin' | null;
   const activeInitialRole = paramRole || initialRole;
-  
+
   const [role, setRole] = useState<'client' | 'ca' | 'firm_admin'>(activeInitialRole);
-  const supabase = createClient();
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -84,14 +83,13 @@ export function RegisterForm({ initialRole = 'client' }: { initialRole?: 'client
     setIsLoading(true);
 
     try {
-      toast.success(`Registration successful as ${role.toUpperCase()}! Redirecting to workspace...`);
-      if (role === 'client') {
-        router.push('/client/dashboard');
-      } else {
-        router.push('/ca/dashboard');
-      }
-    } catch (error: any) {
-      toast.error('Something went wrong. Please try again.');
+      const mappedRole: UserRole = role === 'client' ? 'CLIENT' : role === 'ca' ? 'CA' : 'STAFF';
+      await signUp(values.email, values.password, values.fullName, mappedRole);
+      toast.success('Registration successful. Check your email to verify your account.');
+      router.push('/verify-email');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +97,6 @@ export function RegisterForm({ initialRole = 'client' }: { initialRole?: 'client
 
   return (
     <div className="grid gap-6">
-      {/* Role Selection Tabs */}
       <div className="flex p-1.5 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
         <button
           type="button"
@@ -136,7 +133,6 @@ export function RegisterForm({ initialRole = 'client' }: { initialRole?: 'client
         </button>
       </div>
 
-      {/* Role Banner Badge */}
       <div className="p-3 bg-lime-600/10 border border-lime-500/30 rounded-xl text-xs text-lime-700 dark:text-lime-400 flex items-center justify-between font-semibold">
         <span>
           Registering as: <strong>{role === 'client' ? 'Client (Taxpayer / Business)' : role === 'ca' ? 'Chartered Accountant (Individual Practice)' : 'CA Accounting Firm'}</strong>

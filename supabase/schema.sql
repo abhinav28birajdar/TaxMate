@@ -1,7 +1,137 @@
 -- ============================================================================
 -- TaxMate - Enterprise Supabase Master Database Schema (v4.0)
 -- Authoritative, production-ready single source of truth for Supabase DB setup
--- Generated: 2026-07-29
+
+CREATE OR REPLACE FUNCTION public.is_admin_user()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  app_role TEXT;
+  user_role_meta TEXT;
+BEGIN
+  app_role := COALESCE(NULLIF(UPPER(auth.jwt() -> 'app_metadata' ->> 'role'), ''), '');
+  user_role_meta := COALESCE(NULLIF(UPPER(auth.jwt() -> 'user_metadata' ->> 'role'), ''), '');
+
+  RETURN app_role IN ('SUPER_ADMIN', 'ADMIN') OR user_role_meta IN ('SUPER_ADMIN', 'ADMIN');
+END;
+$$;
+
+DO $$ BEGIN
+  CREATE TYPE user_role AS ENUM ('SUPER_ADMIN', 'CA', 'CLIENT', 'STAFF');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  full_name TEXT,
+  role user_role NOT NULL DEFAULT 'CLIENT'::user_role,
+  avatar_url TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  last_login_at TIMESTAMPTZ,
+  two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+  onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_email_lower ON public.profiles (LOWER(email));
+
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
+CREATE INDEX IF NOT EXISTS idx_profiles_is_active ON public.profiles(is_active);
+CREATE INDEX IF NOT EXISTS idx_profiles_last_login_at ON public.profiles(last_login_at DESC);
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "profiles_select_own"
+  ON public.profiles
+  FOR SELECT
+  USING (auth.uid() = id OR public.is_admin_user());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "profiles_insert_own"
+  ON public.profiles
+  FOR INSERT
+  WITH CHECK (auth.uid() = id OR public.is_admin_user());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "profiles_update_own"
+  ON public.profiles
+  FOR UPDATE
+  USING (auth.uid() = id OR public.is_admin_user())
+  WITH CHECK (auth.uid() = id OR public.is_admin_user());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "profiles_delete_admin_only"
+  ON public.profiles
+  FOR DELETE
+  USING (public.is_admin_user());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE OR REPLACE FUNCTION public.handle_auth_user_created()
+RETURNS TRIGGER AS $$
+DECLARE
+  extracted_role user_role := 'CLIENT'::user_role;
+  extracted_name TEXT;
+BEGIN
+  extracted_name := COALESCE(NEW.raw_user_meta_data->>'name', NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1));
+
+  BEGIN
+    extracted_role := COALESCE(NULLIF(UPPER(NEW.raw_user_meta_data->>'role'), '')::user_role, 'CLIENT'::user_role);
+  EXCEPTION WHEN others THEN
+    extracted_role := 'CLIENT'::user_role;
+  END;
+
+  INSERT INTO public.profiles (id, email, full_name, role, is_verified, metadata)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    extracted_name,
+    extracted_role,
+    COALESCE(NEW.email_confirmed_at IS NOT NULL, FALSE),
+    COALESCE(NEW.raw_user_meta_data, '{}'::jsonb)
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET
+    email = EXCLUDED.email,
+    full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name),
+    role = COALESCE(EXCLUDED.role, public.profiles.role),
+    is_verified = EXCLUDED.is_verified,
+    metadata = COALESCE(EXCLUDED.metadata, public.profiles.metadata),
+    updated_at = NOW();
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_auth_user_created();
+
+CREATE OR REPLACE FUNCTION public.handle_profile_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
+CREATE TRIGGER update_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_profile_updated_at();
+-- File: supabase/schema.sql
 -- ============================================================================
 
 BEGIN;
@@ -12,19 +142,6 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "citext";
-
--- ============================================================================
--- 2. CUSTOM ENUM TYPES
--- ============================================================================
-
-DO $$ BEGIN
-  CREATE TYPE user_role AS ENUM ('SUPER_ADMIN', 'CA', 'CLIENT', 'STAFF');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE TYPE user_status AS ENUM ('ACTIVE', 'INACTIVE', 'BANNED', 'PENDING_VERIFICATION', 'SUSPENDED');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE TYPE ca_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED');
@@ -125,7 +242,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Users Table
 CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  email CITEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
   password_hash TEXT,
   name TEXT NOT NULL,
   phone TEXT,
@@ -154,6 +271,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   deleted_at TIMESTAMPTZ
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON public.users (LOWER(email));
 
 -- User Profiles: Extended personal profile
 CREATE TABLE IF NOT EXISTS public.user_profiles (

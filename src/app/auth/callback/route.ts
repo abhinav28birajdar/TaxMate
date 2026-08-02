@@ -1,17 +1,25 @@
 import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
+import { getDashboardPathForRole, normalizeRole } from '@/lib/auth-routing'
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
     // if "next" is in param, use it as the redirect URL
-    const next = searchParams.get('next') ?? '/dashboard'
+    const next = searchParams.get('next')
 
     if (code) {
         const supabase = await createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
-            return NextResponse.redirect(`${origin}${next}`)
+            let redirectPath = next
+
+            if (!redirectPath) {
+                const { data } = await supabase.auth.getUser()
+                redirectPath = getDashboardPathForRole(normalizeRole(data.user?.user_metadata?.role || null))
+            }
+
+            return NextResponse.redirect(`${origin}${redirectPath || '/landing'}`)
         }
         
         // Include error details for better user communication 

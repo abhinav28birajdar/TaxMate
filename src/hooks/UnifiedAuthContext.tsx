@@ -5,11 +5,12 @@
 
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
+import { PUBLIC_ROUTES, getAuthRedirectForRole, getDashboardPathForRole, normalizeRole } from '@/lib/auth-routing';
 
 export type UserRole = 'SUPER_ADMIN' | 'CA' | 'CLIENT' | 'STAFF' | null;
 export type AccountStatus = 'PENDING_VERIFICATION' | 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
@@ -46,6 +47,36 @@ interface AuthContextType {
   refreshSession: () => Promise<void>;
 }
 
+type ProfileRecord = {
+  id: string;
+  email?: string | null;
+  full_name?: string | null;
+  role?: string | null;
+  avatar_url?: string | null;
+  is_active?: boolean | null;
+  is_verified?: boolean | null;
+  last_login_at?: string | null;
+  two_factor_enabled?: boolean | null;
+  timezone?: string | null;
+};
+
+function buildUserProfile(userId: string, email: string, profileData?: ProfileRecord | null): UserProfile {
+  const role = normalizeRole(profileData?.role || null) ?? 'CLIENT';
+
+  return {
+    id: userId,
+    email: profileData?.email || email,
+    name: profileData?.full_name || email.split('@')[0] || '',
+    role,
+    avatarUrl: profileData?.avatar_url || undefined,
+    status: profileData?.is_active === false ? 'INACTIVE' : profileData?.is_verified ? 'ACTIVE' : 'PENDING_VERIFICATION',
+    onboardingCompleted: Boolean(profileData?.is_verified),
+    timezone: profileData?.timezone || 'Asia/Kolkata',
+    lastLoginAt: profileData?.last_login_at || undefined,
+    twoFactorEnabled: Boolean(profileData?.two_factor_enabled),
+  };
+}
+
 const defaultContext: AuthContextType = {
   user: null,
   session: null,
@@ -77,7 +108,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+
+  const syncProfile = useCallback(
+    async (authUser: Session['user']) => {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      const profile = buildUserProfile(authUser.id, authUser.email ?? '', profileData as ProfileRecord | null);
+      setUser(profile);
+      setRole(profile.role);
+
+      await supabase
+        .from('profiles')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('id', authUser.id);
+    },
+    [supabase]
+  );
 
   // Initialize auth state from session
   useEffect(() => {
@@ -100,37 +151,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (currentSession) {
           setSession(currentSession);
 
-          // Fetch user profile from database
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', currentSession.user.id)
-            .single();
-
-          if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Profile fetch error:', profileError);
-          } else if (profileData) {
-            const userProfile: UserProfile = {
-              id: profileData.id,
-              email: profileData.email,
-              name: profileData.full_name || '',
-              role: (profileData.role?.toUpperCase() || 'CLIENT') as UserRole,
-              avatarUrl: profileData.avatar_url || undefined,
-              status: profileData.is_active ? 'ACTIVE' : 'INACTIVE',
-              onboardingCompleted: profileData.is_verified || false,
-              timezone: 'Asia/Kolkata',
-              lastLoginAt: profileData.last_login_at || undefined,
-              twoFactorEnabled: profileData.two_factor_enabled || false,
-            };
-            setUser(userProfile);
-            setRole(userProfile.role);
-
-            // Update last login
-            await supabase
-              .from('profiles')
-              .update({ last_login_at: new Date().toISOString() })
-              .eq('id', currentSession.user.id);
-          }
+          await syncProfile(currentSession.user);
         }
 
         setIsLoading(false);
@@ -152,36 +173,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRole(null);
       } else if (event === 'SIGNED_IN' && newSession) {
         setSession(newSession);
-        // Fetch fresh user profile
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', newSession.user.id)
-          .single();
-
-        if (profileData) {
-          const userProfile: UserProfile = {
-            id: profileData.id,
-            email: profileData.email,
-            name: profileData.full_name || '',
-            role: (profileData.role?.toUpperCase() || 'CLIENT') as UserRole,
-            avatarUrl: profileData.avatar_url || undefined,
-            status: profileData.is_active ? 'ACTIVE' : 'INACTIVE',
-            onboardingCompleted: profileData.is_verified || false,
-            timezone: 'Asia/Kolkata',
-            lastLoginAt: profileData.last_login_at || undefined,
-            twoFactorEnabled: profileData.two_factor_enabled || false,
-          };
-          setUser(userProfile);
-          setRole(userProfile.role);
-        }
+        await syncProfile(newSession.user);
       }
     });
 
     return () => {
       subscription?.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, syncProfile]);
 
   // Redirect based on auth state
   useEffect(() => {
@@ -189,19 +188,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const isAuthenticated = !!user && !!session;
 
-    const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/verify-email'];
-    const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname?.startsWith(route));
+    const isPublicRoute = pathname ? PUBLIC_ROUTES.some((route) => (route === '/' ? pathname === '/' : pathname === route || pathname.startsWith(`${route}/`) || pathname.startsWith(route))) : false;
 
     if (!isAuthenticated && !isPublicRoute) {
-      router.push('/login');
-    } else if (isAuthenticated && pathname === '/login') {
-      if (!user?.onboardingCompleted) {
-        router.push('/onboarding');
-      } else {
-        router.push('/dashboard');
-      }
+      router.replace(`/login?redirectTo=${encodeURIComponent(pathname || '/landing')}`);
+    } else if (isAuthenticated && ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'].some((route) => pathname?.startsWith(route))) {
+      router.replace(getAuthRedirectForRole(user?.role));
     }
-  }, [isLoading, pathname, router, session, user, user?.onboardingCompleted]);
+  }, [isLoading, pathname, router, session, user]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -225,13 +219,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (data.session) {
           toast.success('Signed in successfully');
-          router.push('/dashboard');
+          router.push(getDashboardPathForRole(data.user?.user_metadata?.role || role));
         }
       } catch (error) {
         throw error;
       }
     },
-    [supabase, router]
+    [supabase, router, role]
   );
 
   const signUp = useCallback(
@@ -296,7 +290,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setSession(null);
       setRole(null);
       toast.success('Signed out successfully');
-      router.push('/');
+      router.push('/landing');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign out failed';
       toast.error(message);
@@ -353,10 +347,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (data.timezone !== undefined) dbData.timezone = data.timezone;
         if (data.twoFactorEnabled !== undefined) dbData.two_factor_enabled = data.twoFactorEnabled;
 
-        const { error } = await supabase
-          .from('profiles')
-          .update(dbData)
-          .eq('id', user.id);
+        const { error } = await supabase.from('profiles').update(dbData).eq('id', user.id);
 
         if (error) throw error;
 

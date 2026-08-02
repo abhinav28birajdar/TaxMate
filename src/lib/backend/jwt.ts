@@ -2,7 +2,7 @@ import { jwtVerify, SignJWT, errors } from 'jose';
 import { env } from './env';
 import { unauthorized } from './errors';
 
-const secret = new TextEncoder().encode(env.JWT_SECRET);
+const secret = new TextEncoder().encode(env.JWT_SECRET ?? '');
 
 export interface JWTPayload {
   userId: string;

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, KeyRound, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/UnifiedAuthContext";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -28,7 +28,7 @@ const loginSchema = z.object({
 export function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const supabase = createClient();
+  const { signIn } = useAuth();
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -38,41 +38,15 @@ export function LoginForm() {
     },
   });
 
-  const handleFillDemoCredentials = () => {
-    form.setValue("email", "abhinavbirajdar28@gmail.com");
-    form.setValue("password", "123456789");
-    toast.info("Demo Master CA credentials filled!");
-  };
-
   async function onSubmit(values: z.infer<typeof loginSchema>) {
     setIsLoading(true);
 
     try {
-      // Demo bypass check for instant test access
-      if (values.email === "abhinavbirajdar28@gmail.com" && values.password === "123456789") {
-        toast.success("Welcome back, Master CA Abhinav! Access granted.");
-        router.push("/ca/dashboard");
-        return;
-      }
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email: values.email,
-        password: values.password,
-      });
-
-      if (error) {
-        // Fallback for dev environment login
-        toast.success("Logged in successfully!");
-        router.push("/ca/dashboard");
-        return;
-      }
-
-      toast.success("Successfully logged in!");
-      router.push("/ca/dashboard");
+      await signIn(values.email, values.password);
       router.refresh();
     } catch (error) {
-      toast.success("Logged in with master test access!");
-      router.push("/ca/dashboard");
+      const message = error instanceof Error ? error.message : "Login failed";
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -80,41 +54,16 @@ export function LoginForm() {
 
   return (
     <div className="grid gap-6">
-      {/* 1-Click Demo Credentials Card */}
-      <div className="p-3.5 bg-lime-600/10 border border-lime-500/30 rounded-2xl space-y-2 text-xs">
-        <div className="flex items-center justify-between font-bold text-lime-700 dark:text-lime-400">
-          <span className="flex items-center gap-1.5">
-            <KeyRound className="w-4 h-4 text-lime-600" /> Master Test Credentials
-          </span>
-          <span className="text-[10px] bg-lime-600/20 px-2 py-0.5 rounded-full font-bold">
-            Full Access
-          </span>
-        </div>
-        <div className="font-mono text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5">
-          <div>Email: <strong className="text-slate-900 dark:text-white">abhinavbirajdar28@gmail.com</strong></div>
-          <div>Pass: <strong className="text-slate-900 dark:text-white">123456789</strong></div>
-        </div>
-        <Button
-          type="button"
-          onClick={handleFillDemoCredentials}
-          variant="outline"
-          size="sm"
-          className="w-full h-8 text-xs font-semibold border-lime-500/40 text-lime-700 dark:text-lime-400 hover:bg-lime-600/20"
-        >
-          <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-lime-600" /> Auto-fill Demo Account
-        </Button>
-      </div>
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
             name="email"
-            render={({ field }: { field: any }) => (
+            render={({ field }) => (
               <FormItem>
                 <FormLabel>Email Address</FormLabel>
                 <FormControl>
-                  <Input placeholder="abhinavbirajdar28@gmail.com" {...field} disabled={isLoading} className="text-xs" />
+                  <Input placeholder="name@example.com" {...field} disabled={isLoading} className="text-xs" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -123,7 +72,7 @@ export function LoginForm() {
           <FormField
             control={form.control}
             name="password"
-            render={({ field }: { field: any }) => (
+            render={({ field }) => (
               <FormItem>
                 <div className="flex items-center justify-between">
                   <FormLabel>Password</FormLabel>
