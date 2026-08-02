@@ -1,7 +1,21 @@
 import { Resend } from 'resend';
 import { createClient } from '@/utils/supabase/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (resend) {
+    return resend;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is required to send email notifications');
+  }
+
+  resend = new Resend(apiKey);
+  return resend;
+}
 
 export type EmailNotificationPayload = {
   userId: string;
@@ -104,7 +118,7 @@ export async function sendEmailNotification(payload: EmailNotificationPayload) {
   }
 
   try {
-    const result = await resend.emails.send({
+    const result = await getResendClient().emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'noreply@taxmate.com',
       to: payload.userEmail,
       subject: payload.subject,

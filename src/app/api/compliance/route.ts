@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+import { getServiceClient } from '../../../lib/backend/supabase';
 
 // GET /api/compliance - Get all compliance items
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getServiceClient();
     const { searchParams } = new URL(request.url);
     const caId = searchParams.get('caId');
     const clientId = searchParams.get('clientId');
@@ -57,6 +52,7 @@ export async function GET(request: NextRequest) {
 // POST /api/compliance - Create compliance item
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getServiceClient();
     const body = await request.json();
 
     const priorityMap: Record<string, string> = {
@@ -113,6 +109,7 @@ export async function POST(request: NextRequest) {
 // PUT /api/compliance - Update compliance item
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = getServiceClient();
     const body = await request.json();
     const { id } = body;
 
@@ -167,6 +164,7 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/compliance
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getServiceClient();
     const body = await request.json();
     const { id } = body;
 

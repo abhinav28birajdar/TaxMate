@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+import { getServiceClient } from '../../../../lib/backend/supabase';
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getServiceClient();
     const signature = request.headers.get('x-razorpay-signature');
     if (!signature) {
       return NextResponse.json(

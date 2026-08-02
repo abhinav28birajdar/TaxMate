@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import * as bcrypt from 'bcryptjs';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+import { getServiceClient } from '../../../../lib/backend/supabase';
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getServiceClient();
     const body = await request.json();
     const { token, newPassword } = body;
 

@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+import { getServiceClient } from '../../../lib/backend/supabase';
 
 // GET - Get dashboard data
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getServiceClient();
     const caId = request.headers.get('x-ca-id');
 
     if (!caId) {
