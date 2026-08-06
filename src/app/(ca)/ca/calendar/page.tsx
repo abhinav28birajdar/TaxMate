@@ -8,13 +8,37 @@ import { Badge } from '@/components/ui/badge';
 
 export default function CACalendarPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [events, setEvents] = useState([
+    { id: '1', title: 'GSTR-3B Monthly Filing Due', client: 'Acme Corp', date: '2026-08-20', time: '11:59 PM', category: 'gst', priority: 'high' },
+    { id: '2', title: 'Advance Tax Q2 Consultation', client: 'Mehta Logistics', date: '2026-08-25', time: '02:00 PM', category: 'meeting', priority: 'medium' },
+    { id: '3', title: 'TDS Return Filing (Form 26Q)', client: 'TechNova Solutions', date: '2026-08-31', time: '05:00 PM', category: 'income_tax', priority: 'urgent' },
+    { id: '4', title: 'Statutory Audit Review', client: 'Apex Infra Ltd', date: '2026-09-05', time: '11:00 AM', category: 'audit', priority: 'medium' }
+  ]);
 
-  const events = [
-    { id: '1', title: 'GSTR-3B Monthly Filing Due', client: 'Acme Corp', date: '2026-07-20', time: '11:59 PM', category: 'gst', priority: 'high' },
-    { id: '2', title: 'Advance Tax Q2 Consultation', client: 'Mehta Logistics', date: '2026-07-25', time: '02:00 PM', category: 'meeting', priority: 'medium' },
-    { id: '3', title: 'TDS Return Filing (Form 26Q)', client: 'TechNova Solutions', date: '2026-07-31', time: '05:00 PM', category: 'income_tax', priority: 'urgent' },
-    { id: '4', title: 'Statutory Audit Review', client: 'Apex Infra Ltd', date: '2026-08-05', time: '11:00 AM', category: 'audit', priority: 'medium' }
-  ];
+  const [newTitle, setNewTitle] = useState('');
+  const [newClient, setNewClient] = useState('');
+  const [newCategory, setNewCategory] = useState('gst');
+  const [newPriority, setNewPriority] = useState('medium');
+  const [newDate, setNewDate] = useState('2026-08-15');
+
+  const handleAddEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle) return;
+    const newEvt = {
+      id: Date.now().toString(),
+      title: newTitle,
+      client: newClient || 'General Client',
+      date: newDate,
+      time: '10:00 AM',
+      category: newCategory,
+      priority: newPriority,
+    };
+    setEvents([newEvt, ...events]);
+    setNewTitle('');
+    setNewClient('');
+    setShowModal(false);
+  };
 
   const filteredEvents = selectedCategory === 'all' 
     ? events 
@@ -29,7 +53,7 @@ export default function CACalendarPage() {
           </h1>
           <p className="text-sm text-slate-400">Track statutory filing deadlines, client reviews, and appointments</p>
         </div>
-        <Button className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-semibold gap-2">
+        <Button onClick={() => setShowModal(true)} className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-semibold gap-2 shadow-md shadow-lime-600/20">
           <Plus className="w-4 h-4" /> Add Calendar Reminder
         </Button>
       </div>
@@ -54,7 +78,7 @@ export default function CACalendarPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 bg-slate-900 border-slate-800 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-100 mb-4">Upcoming Schedule</h2>
+          <h2 className="text-lg font-semibold text-slate-100 mb-4">Upcoming Schedule ({filteredEvents.length})</h2>
           <div className="space-y-3">
             {filteredEvents.map(evt => (
               <div key={evt.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 hover:border-lime-500/40 transition-colors flex items-start justify-between">
@@ -87,23 +111,104 @@ export default function CACalendarPage() {
         </Card>
 
         <Card className="bg-slate-900 border-slate-800 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-100">Statutory Deadlines (July 2026)</h2>
+          <h2 className="text-lg font-semibold text-slate-100">Statutory Deadlines (August 2026)</h2>
           <div className="space-y-3 text-xs">
             <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
-              <span className="text-lime-400 font-bold block mb-0.5">July 20</span>
-              <span className="text-slate-200 font-medium">GSTR-3B Filing for June</span>
+              <span className="text-lime-400 font-bold block mb-0.5">August 11</span>
+              <span className="text-slate-200 font-medium">GSTR-1 Monthly Return (July)</span>
             </div>
             <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
-              <span className="text-lime-400 font-bold block mb-0.5">July 31</span>
-              <span className="text-slate-200 font-medium">ITR Filing Non-Audit Cases</span>
+              <span className="text-lime-400 font-bold block mb-0.5">August 20</span>
+              <span className="text-slate-200 font-medium">GSTR-3B Monthly Return (July)</span>
             </div>
             <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
-              <span className="text-lime-400 font-bold block mb-0.5">August 15</span>
-              <span className="text-slate-200 font-medium">Form 16 / TDS Certificates</span>
+              <span className="text-lime-400 font-bold block mb-0.5">September 15</span>
+              <span className="text-slate-200 font-medium">Advance Tax Quarter 2 Installment</span>
             </div>
           </div>
         </Card>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 text-slate-100 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-lime-400" /> Add Tax Reminder
+            </h3>
+            <form onSubmit={handleAddEvent} className="space-y-3 text-xs">
+              <div>
+                <label className="block mb-1 text-slate-300 font-medium">Reminder Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., File Form 10IEA for Tax Regime"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-lime-500"
+                />
+              </div>
+
+              <div>
+                <label className="block mb-1 text-slate-300 font-medium">Client Name</label>
+                <input
+                  type="text"
+                  placeholder="Client or Business Name"
+                  value={newClient}
+                  onChange={(e) => setNewClient(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-lime-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1 text-slate-300 font-medium">Category</label>
+                  <select
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-lime-500"
+                  >
+                    <option value="gst">GST</option>
+                    <option value="income_tax">Income Tax</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="audit">Audit</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1 text-slate-300 font-medium">Priority</label>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-lime-500"
+                  >
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block mb-1 text-slate-300 font-medium">Due Date</label>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-lime-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="border-slate-800 text-slate-300">
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-bold">
+                  Save Reminder
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

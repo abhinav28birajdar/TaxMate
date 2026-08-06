@@ -21,13 +21,13 @@ if (!supabaseKey || supabaseKey === '' || supabaseKey.includes('placeholder')) {
 }
 
 export function createClient() {
-    if (!supabaseUrl || !supabaseKey) {
-        throw new Error(
-            'Supabase credentials are not configured. ' +
-            'Please check your .env.local file and ensure NEXT_PUBLIC_SUPABASE_URL ' +
-            'and NEXT_PUBLIC_SUPABASE_ANON_KEY are set correctly.'
-        )
-    }
+    const url = (supabaseUrl && supabaseUrl !== '' && !supabaseUrl.includes('PLACEHOLDER')) 
+        ? supabaseUrl 
+        : 'https://placeholder.supabase.co';
 
-    return createBrowserClient(supabaseUrl, supabaseKey)
+    const key = (supabaseKey && supabaseKey !== '' && !supabaseKey.includes('placeholder')) 
+        ? supabaseKey 
+        : 'placeholder-anon-key';
+
+    return createBrowserClient(url, key)
 }

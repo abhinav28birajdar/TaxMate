@@ -15,6 +15,22 @@ export default function DigitalSignature({ onSave, title = 'Digital E-Signature'
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
 
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    const scaleX = canvas.width / (rect.width || 1);
+    const scaleY = canvas.height / (rect.height || 1);
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
     const canvas = canvasRef.current;
@@ -22,12 +38,9 @@ export default function DigitalSignature({ onSave, title = 'Digital E-Signature'
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
+    const { x, y } = getCanvasCoordinates(e);
     ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    ctx.moveTo(x, y);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -37,14 +50,12 @@ export default function DigitalSignature({ onSave, title = 'Digital E-Signature'
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
-    ctx.strokeStyle = '#65a30d'; // lime-600 signature stroke
-    ctx.lineWidth = 2.5;
+    const { x, y } = getCanvasCoordinates(e);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#84cc16'; // vibrant lime-500 stroke
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.stroke();
 
     setHasSigned(true);
@@ -111,7 +122,7 @@ export default function DigitalSignature({ onSave, title = 'Digital E-Signature'
             size="sm"
             onClick={handleSaveSignature}
             disabled={!hasSigned}
-            className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-bold"
+            className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-bold shadow-sm shadow-lime-600/20"
           >
             <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Save Signature
           </Button>

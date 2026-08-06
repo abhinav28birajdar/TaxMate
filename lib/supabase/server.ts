@@ -7,18 +7,19 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Function to create a Supabase client for server components
 export async function createServerSupabaseClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Supabase credentials are not configured. ' +
-      'Please check your .env.local file.'
-    );
-  }
+  const url = (supabaseUrl && supabaseUrl !== '' && !supabaseUrl.includes('PLACEHOLDER')) 
+    ? supabaseUrl 
+    : 'https://placeholder.supabase.co';
+
+  const key = (supabaseAnonKey && supabaseAnonKey !== '' && !supabaseAnonKey.includes('placeholder')) 
+    ? supabaseAnonKey 
+    : 'placeholder-anon-key';
 
   const cookieStore = await cookies();
   
   return createServerClient<Database>(
-    supabaseUrl,
-    supabaseAnonKey,
+    url,
+    key,
     {
       cookies: {
         getAll() {

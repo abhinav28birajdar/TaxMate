@@ -174,15 +174,16 @@ let analyticsClient: SupabaseClient<AnyDatabase> | null = null;
  * Used for all main application data and authentication
  */
 export function getPrimaryClient(): SupabaseClient<AnyDatabase> {
-  if (!PRIMARY_SUPABASE_URL || !PRIMARY_SUPABASE_ANON_KEY) {
-    throw new Error(
-      'Primary Supabase credentials are not configured.\n' +
-      'Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.'
-    );
-  }
+  const url = (PRIMARY_SUPABASE_URL && PRIMARY_SUPABASE_URL !== '' && !PRIMARY_SUPABASE_URL.includes('PLACEHOLDER')) 
+    ? PRIMARY_SUPABASE_URL 
+    : 'https://placeholder.supabase.co';
+
+  const key = (PRIMARY_SUPABASE_ANON_KEY && PRIMARY_SUPABASE_ANON_KEY !== '' && !PRIMARY_SUPABASE_ANON_KEY.includes('placeholder')) 
+    ? PRIMARY_SUPABASE_ANON_KEY 
+    : 'placeholder-anon-key';
 
   if (!primaryClient) {
-    primaryClient = createClient<AnyDatabase>(PRIMARY_SUPABASE_URL, PRIMARY_SUPABASE_ANON_KEY, {
+    primaryClient = createClient<AnyDatabase>(url, key, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,

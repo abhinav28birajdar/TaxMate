@@ -41,6 +41,7 @@
   ],
   "exclude": [
     "node_modules",
+    ".next",
     "prisma/**/*.ts",
     "server/**/*.ts",
     "supabase/**/*.ts"

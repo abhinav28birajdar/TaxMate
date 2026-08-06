@@ -35,17 +35,16 @@ if (typeof window !== 'undefined') {
  * Creates or returns the singleton Supabase browser client
  */
 export function createClient(): SupabaseClient<Database> {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Supabase credentials are not configured. ' +
-      'Please check your .env.local file and ensure:\n' +
-      '- NEXT_PUBLIC_SUPABASE_URL is set\n' +
-      '- NEXT_PUBLIC_SUPABASE_ANON_KEY is set'
-    );
-  }
+  const url = (supabaseUrl && supabaseUrl !== '' && !supabaseUrl.includes('PLACEHOLDER')) 
+    ? supabaseUrl 
+    : 'https://placeholder.supabase.co';
+
+  const key = (supabaseAnonKey && supabaseAnonKey !== '' && !supabaseAnonKey.includes('placeholder')) 
+    ? supabaseAnonKey 
+    : 'placeholder-anon-key';
 
   if (!browserClient) {
-    browserClient = createSupabaseClient<Database>(supabaseUrl, supabaseAnonKey, {
+    browserClient = createSupabaseClient<Database>(url, key, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,

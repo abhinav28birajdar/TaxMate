@@ -93,7 +93,8 @@ tsconfig.tsbuildinfo
 *.sql
 *.SQL
 !supabase/schema.sql
-database/
+!database/master.sql
+!database/complete_production_schema.sql
 build.log
 # Note: Keep supabase/schema.sql, only ignore local migrations
 supabase/migrations/
