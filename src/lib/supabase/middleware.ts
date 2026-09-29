@@ -55,7 +55,9 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const role = normalizeRole(user.user_metadata?.role || user.user_metadata?.user_role || null);
     const dashboardPath = getDashboardPathForRole(role);
-    const isPublicRoute = PUBLIC_ROUTES.some((route) => (route === '/' ? path === '/' : path === route || path.startsWith(`${route}/`) || path.startsWith(route)));
+    const isPublicRoute = PUBLIC_ROUTES.some((route) =>
+      route === '/' ? path === '/' : path === route || path.startsWith(`${route}/`)
+    );
 
     if (isPublicRoute && (path.startsWith('/login') || path.startsWith('/register') || path.startsWith('/forgot-password') || path.startsWith('/reset-password') || path.startsWith('/verify-email'))) {
       const url = request.nextUrl.clone();

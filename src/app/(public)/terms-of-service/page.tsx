@@ -1,13 +1,10 @@
 'use client';
 
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { ShieldCheck, FileText } from 'lucide-react';
 
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
-      <Navbar />
 
       <main className="flex-1 container mx-auto px-4 py-12 max-w-4xl space-y-8">
         <div className="border-b border-slate-200 dark:border-slate-800 pb-6 space-y-2">
@@ -36,7 +33,6 @@ export default function TermsOfServicePage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

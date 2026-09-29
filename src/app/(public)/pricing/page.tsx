@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { Check, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -65,7 +63,6 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
-      <Navbar />
 
       <main className="flex-1 container mx-auto px-4 py-12 max-w-6xl space-y-10">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
@@ -154,7 +151,6 @@ export default function PricingPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

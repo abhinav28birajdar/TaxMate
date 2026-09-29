@@ -19,21 +19,14 @@ out/
 build/
 dist/
 .vercel/
-.env*.local
-.env*.production
-.env.local.example
-.env.production.local
-
 # ============================================================================
 # Environment Variables & Secrets
 # ============================================================================
 .env
-.env.local
 .env.*.local
 .env.production
 .env.development
 !.env.example
-!.env.local.example
 
 # ============================================================================
 # Testing
@@ -90,16 +83,10 @@ tsconfig.tsbuildinfo
 *.db
 *.db-wal
 *.db-shm
-*.sql
-*.SQL
-!supabase/schema.sql
-!database/master.sql
-!database/complete_production_schema.sql
-build.log
-# Note: Keep supabase/schema.sql, only ignore local migrations
-supabase/migrations/
-supabase/.test.sql
 *.sql.local
+supabase/.test.sql
+supabase/.branches/
+supabase/.temp/
 
 # ============================================================================
 # OS Files

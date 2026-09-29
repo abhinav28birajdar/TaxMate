@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { Mail, Phone, MapPin, Send, MessageSquare, ShieldCheck, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,13 +11,21 @@ export default function ContactPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    const name = String(data.get('name') || '');
+    const email = String(data.get('email') || '');
+    const subject = String(data.get('subject') || 'TaxMate enquiry');
+    const message = String(data.get('message') || '');
+    const body = `Name: ${name}\nEmail: ${email}\n\n${message}`;
+
+    window.location.href = `mailto:support@taxmate.app?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setSubmitted(true);
-    toast.success('Message sent! Support ticket created at support@taxmate.app');
+    toast.success('Your email client is ready with the support message.');
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
-      <Navbar />
 
       <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl space-y-10">
         <div className="text-center space-y-3 max-w-2xl mx-auto">
@@ -77,31 +83,31 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block font-semibold mb-1">Your Name *</label>
-              <Input required placeholder="Abhinav Birajdar" className="text-xs" />
+              <Input name="name" required placeholder="Abhinav Birajdar" className="text-xs" />
             </div>
             <div>
               <label className="block font-semibold mb-1">Email Address *</label>
-              <Input required type="email" placeholder="name@example.com" className="text-xs" />
+              <Input name="email" required type="email" placeholder="name@example.com" className="text-xs" />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold mb-1">Subject / Technical Issue *</label>
-            <Input required placeholder="How can we help you?" className="text-xs" />
+            <Input name="subject" required placeholder="How can we help you?" className="text-xs" />
           </div>
 
           <div>
             <label className="block text-xs font-semibold mb-1">Detailed Message *</label>
-            <textarea required rows={4} className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-lime-600 focus:outline-none" placeholder="Provide details about your query..." />
+            <textarea name="message" required rows={4} className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-lime-600 focus:outline-none" placeholder="Provide details about your query..." />
           </div>
 
           <Button type="submit" className="w-full bg-lime-600 hover:bg-lime-500 text-white font-bold py-3 rounded-xl shadow-md shadow-lime-600/20 text-xs">
             <Send className="w-4 h-4 mr-2" /> Send Message to support@taxmate.app
           </Button>
+          {submitted && <p className="text-center text-xs text-lime-600">Message prepared. Complete sending it in your email client.</p>}
         </form>
       </main>
 
-      <Footer />
     </div>
   );
 }

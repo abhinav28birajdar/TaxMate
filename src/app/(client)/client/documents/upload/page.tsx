@@ -1,24 +1,70 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileText, ArrowLeft, Camera, Sparkles, CheckCircle } from 'lucide-react';
+import { Upload, FileText, ArrowLeft, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
+import { createClient } from '@/utils/supabase/client';
 
 export default function DocumentUploadPage() {
   const router = useRouter();
   const [docCategory, setDocCategory] = useState('Bank Statement');
   const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const supabase = createClient();
 
-  const handleUpload = (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) {
+      toast.error('Please sign in before uploading a document.');
+      return;
+    }
+    if (!selectedFile) {
+      toast.error('Choose a PDF, JPG, or PNG file first.');
+      return;
+    }
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error('Files must be smaller than 10 MB.');
+      return;
+    }
+
     setUploading(true);
-    setTimeout(() => {
+    try {
+      const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+      const storagePath = `${user.id}/${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(storagePath, selectedFile, { contentType: selectedFile.type, upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { error: documentError } = await supabase.from('documents').insert({
+        user_id: user.id,
+        client_id: user.id,
+        file_name: selectedFile.name,
+        file_type: selectedFile.type,
+        file_size: selectedFile.size,
+        file_url: storagePath,
+        document_type: docCategory,
+        metadata: { storage_path: storagePath, extraction_status: 'pending' },
+      });
+
+      if (documentError) {
+        await supabase.storage.from('documents').remove([storagePath]);
+        throw documentError;
+      }
+
+      toast.success('Document uploaded. Processing will continue in the background.');
+      router.push('/client/documents');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Document upload failed.');
+    } finally {
       setUploading(false);
-      toast.success('Document uploaded & OCR processed successfully!');
-      router.push('/client/dashboard');
-    }, 1500);
+    }
   };
 
   return (
@@ -50,25 +96,36 @@ export default function DocumentUploadPage() {
           </select>
         </div>
 
-        <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center space-y-4 bg-slate-50/50 dark:bg-slate-800/40 hover:border-lime-600 transition-all cursor-pointer">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf,image/jpeg,image/png"
+          className="sr-only"
+          onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center space-y-4 bg-slate-50/50 dark:bg-slate-800/40 hover:border-primary transition-all cursor-pointer"
+        >
           <div className="w-12 h-12 rounded-full bg-lime-600/10 text-lime-600 mx-auto flex items-center justify-center border border-lime-600/20">
             <Upload className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs font-bold text-slate-900 dark:text-white">Drag & drop document files here</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">or click to browse from device</p>
+            <p className="text-xs font-bold text-slate-900 dark:text-white">{selectedFile?.name ?? 'Choose a document file'}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">PDF, JPG, or PNG up to 10 MB</p>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-lime-600/10 text-lime-600 dark:text-lime-400 rounded-full text-[10px] font-bold">
             <Sparkles className="w-3 h-3" /> Automatic Tesseract OCR Enabled
           </div>
-        </div>
+        </button>
 
         <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
           <Button type="button" variant="outline" onClick={() => router.back()}>
             Cancel
           </Button>
-          <Button type="submit" disabled={uploading} className="bg-lime-600 hover:bg-lime-500 text-white font-semibold shadow-md shadow-lime-600/20">
-            {uploading ? 'Processing OCR & Uploading...' : 'Upload File to Vault'}
+          <Button type="submit" disabled={uploading || !selectedFile} className="font-semibold shadow-md shadow-primary/20">
+            {uploading ? 'Uploading...' : 'Upload File to Vault'}
           </Button>
         </div>
       </form>

@@ -37,7 +37,8 @@ interface AuthContextType {
   
   // Methods
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
+  signUp: (email: string, password: string, name: string, role: UserRole, metadata?: Record<string, string>) => Promise<void>;
+  resendEmailVerification: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   verifyOTP: (phone: string, token: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -85,6 +86,7 @@ const defaultContext: AuthContextType = {
   isAuthenticated: false,
   signIn: async () => {},
   signUp: async () => {},
+  resendEmailVerification: async () => {},
   signOut: async () => {},
   verifyOTP: async () => {},
   resetPassword: async () => {},
@@ -124,7 +126,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       await supabase
         .from('profiles')
-        .update({ last_login_at: new Date().toISOString() })
+        .update({
+          last_login_at: new Date().toISOString(),
+          ...(authUser.email_confirmed_at ? { is_verified: true, is_active: true } : {}),
+        })
         .eq('id', authUser.id);
     },
     [supabase]
@@ -171,7 +176,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(null);
         setSession(null);
         setRole(null);
-      } else if (event === 'SIGNED_IN' && newSession) {
+      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && newSession) {
         setSession(newSession);
         await syncProfile(newSession.user);
       }
@@ -188,7 +193,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const isAuthenticated = !!user && !!session;
 
-    const isPublicRoute = pathname ? PUBLIC_ROUTES.some((route) => (route === '/' ? pathname === '/' : pathname === route || pathname.startsWith(`${route}/`) || pathname.startsWith(route))) : false;
+    const isPublicRoute = pathname
+      ? PUBLIC_ROUTES.some((route) => route === '/' ? pathname === '/' : pathname === route || pathname.startsWith(`${route}/`))
+      : false;
 
     if (!isAuthenticated && !isPublicRoute) {
       router.replace(`/login?redirectTo=${encodeURIComponent(pathname || '/landing')}`);
@@ -229,20 +236,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const signUp = useCallback(
-    async (email: string, password: string, name: string, roleParam: UserRole) => {
+    async (email: string, password: string, name: string, roleParam: UserRole, metadata: Record<string, string> = {}) => {
       try {
-        // First check if user already exists (optional but good for UX)
-        const { data: existingUser } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (existingUser) {
-          toast.error('An account with this email already exists.');
-          return;
-        }
-
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -250,6 +245,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             data: {
               name,
               role: roleParam,
+              ...metadata,
             },
             emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
@@ -265,20 +261,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (data.user && data.user.identities && data.user.identities.length === 0) {
-          toast.error('This email is already taken. Please use a different one.');
-          return;
+          throw new Error('This email is already taken. Please use a different one.');
         }
 
         // Profile is handled by database trigger (on_auth_user_created)
         // No manual public.profiles insert is required here.
 
-        toast.success('Registration successful! Please check your email for verification.');
-        router.push('/verify-email');
+        if (data.session) {
+          toast.success('Account created successfully. Welcome to TaxMate.');
+          router.replace(getDashboardPathForRole(roleParam));
+        } else {
+          window.localStorage.setItem('taxmate.pendingVerificationEmail', email);
+          toast.success('Account created. Please check your email to verify your account.');
+          router.replace('/verify-email');
+        }
       } catch (error) {
         throw error;
       }
     },
     [supabase, router]
+  );
+
+  const resendEmailVerification = useCallback(
+    async (email: string) => {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+
+      window.localStorage.setItem('taxmate.pendingVerificationEmail', email);
+      toast.success('Verification email sent. Check your inbox.');
+    },
+    [supabase]
   );
 
   const signOut = useCallback(async () => {
@@ -391,6 +411,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated: !!user && !!session,
     signIn,
     signUp,
+    resendEmailVerification,
     signOut,
     verifyOTP,
     resetPassword,

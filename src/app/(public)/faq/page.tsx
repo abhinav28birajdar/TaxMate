@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { HelpCircle, ChevronDown, ShieldCheck, Mail } from 'lucide-react';
 import Link from 'next/link';
 
@@ -34,7 +32,6 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
-      <Navbar />
 
       <main className="flex-1 container mx-auto px-4 py-12 max-w-3xl space-y-8">
         <div className="text-center space-y-3">
@@ -72,7 +69,6 @@ export default function FAQPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

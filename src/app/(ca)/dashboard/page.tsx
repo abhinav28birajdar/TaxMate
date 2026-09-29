@@ -1,146 +1,51 @@
-import { Metadata } from "next";
-import { 
-  Users, 
-  FileText, 
-  IndianRupee, 
-  CheckCircle2,
-  Clock,
-  AlertCircle
-} from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight, FileText, ListPlus, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Dashboard - TaxMate CA",
   description: "Overview of your CA practice, clients, and compliance tasks.",
 };
 
+const setupSteps = [
+  { title: "Add your first client", description: "Create a firm-scoped client record before tracking tax work.", href: "/clients/new", icon: UserPlus },
+  { title: "Create a task template", description: "Turn recurring filing work into an assignable checklist.", href: "/tasks/new", icon: ListPlus },
+  { title: "Upload a document", description: "Start the secure document pipeline for a connected client.", href: "/documents", icon: FileText },
+];
+
 export default function CADashboardPage() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Welcome back! Here's an overview of your practice.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button>Add Client</Button>
-          <Button variant="outline">New Task</Button>
-        </div>
+      <div>
+        <p className="text-sm font-medium text-primary">Firm workspace</p>
+        <h1 className="mt-1 text-3xl font-display font-bold tracking-tight">Set up your practice</h1>
+        <p className="mt-2 max-w-2xl text-muted-foreground">Your dashboard will show live client, task, document, revenue, and compliance data once the workspace is connected.</p>
       </div>
 
-      {/* Top Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
-            <Users className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">128</div>
-            <p className="text-xs text-muted-foreground">+4 from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Pending Tasks</CardTitle>
-            <Clock className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-destructive">12 due this week</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Documents for Review</CardTitle>
-            <FileText className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">15</div>
-            <p className="text-xs text-muted-foreground">From 8 different clients</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-            <IndianRupee className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹1.2L</div>
-            <p className="text-xs text-primary">+15% from last month</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-primary/20 bg-primary/[0.04]">
+        <CardHeader>
+          <CardTitle>Connect your firm data</CardTitle>
+          <CardDescription>TaxMate keeps financial and compliance metrics empty until they come from your firm-scoped records.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Link href="/firm/setup"><Button>Finish firm setup <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+          <Link href="/firm/team/invite"><Button variant="outline">Invite your team</Button></Link>
+        </CardContent>
+      </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Compliance Deadlines */}
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Upcoming Deadlines</CardTitle>
-            <CardDescription>
-              GST and ITR deadlines for the next 30 days
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center p-4 border border-border rounded-lg bg-card/50">
-                <div className="p-2 bg-red-500/10 text-red-500 rounded-full mr-4">
-                  <AlertCircle className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold">GSTR-3B Filing</h4>
-                  <p className="text-xs text-muted-foreground">For 45 clients</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold text-red-500">2 Days Left</div>
-                  <div className="text-xs text-muted-foreground">20 Oct 2026</div>
-                </div>
-              </div>
-
-              <div className="flex items-center p-4 border border-border rounded-lg bg-card/50">
-                <div className="p-2 bg-amber-500/10 text-amber-500 rounded-full mr-4">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-semibold">TDS Return (Q2)</h4>
-                  <p className="text-xs text-muted-foreground">For 12 clients</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold">12 Days Left</div>
-                  <div className="text-xs text-muted-foreground">31 Oct 2026</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity */}
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Latest updates from your team and clients
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex items-start gap-4">
-                  <div className="mt-0.5 p-1.5 bg-primary/10 text-primary rounded-full">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">TechNova Solutions uploaded bank statements</p>
-                    <p className="text-xs text-muted-foreground">2 hours ago</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-3">
+        {setupSteps.map(({ title, description, href, icon: Icon }) => (
+          <Card key={title} className="group transition-colors hover:border-primary/40">
+            <CardHeader>
+              <Icon className="mb-2 h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">{title}</CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent><Link href={href} className="inline-flex items-center text-sm font-medium text-primary hover:underline">Open workflow <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" /></Link></CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );

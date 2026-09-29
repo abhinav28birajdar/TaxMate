@@ -53,36 +53,13 @@ export default function ClientDashboard() {
 
                 if (clientError) throw clientError;
 
-                // Fallback / Mock Data if no client is matched yet (e.g. fresh seeding)
+                // A missing profile is a real onboarding state, not a reason to display fabricated financial data.
                 if (!client) {
-                    setClientData({
-                        id: 'mock-client-id',
-                        full_name: user.name || 'Client Business Ltd',
-                        email: user.email,
-                        phone: '+91 98765 43210',
-                        gstin: '27AAAAA1111A1Z1',
-                        pan: 'ABCDE1234F'
-                    });
-                    setCaProfile({
-                        full_name: 'Rajesh Kumar',
-                        email: 'ca@taxmate.com',
-                        phone: '+91 99999 88888',
-                        organization_name: 'Kumar & Associates'
-                    });
-                    setStats({
-                        totalInvoiced: 75000,
-                        totalPaid: 50000,
-                        outstanding: 25000,
-                        pendingTasks: 2,
-                        dueCompliance: 1
-                    });
-                    setRecentInvoices([
-                        { id: '1', invoice_number: 'INV-2026-0012', due_date: '2026-06-25', total_amount: 25000, status: 'sent' }
-                    ]);
-                    setRecentCompliance([
-                        { id: '1', compliance_type: 'gst_r1', due_date: '2026-06-11', status: 'pending' },
-                        { id: '2', compliance_type: 'itr_4', due_date: '2026-07-31', status: 'pending' }
-                    ]);
+                    setClientData(null);
+                    setCaProfile(null);
+                    setStats({ totalInvoiced: 0, totalPaid: 0, outstanding: 0, pendingTasks: 0, dueCompliance: 0 });
+                    setRecentInvoices([]);
+                    setRecentCompliance([]);
                     setLoading(false);
                     return;
                 }
@@ -173,6 +150,29 @@ export default function ClientDashboard() {
                     <div className="w-8 h-8 border-2 border-t-lime-500 border-lime-600/10 animate-spin" />
                     <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Retrieving Secure Feed...</span>
                 </div>
+            </div>
+        );
+    }
+
+    if (!clientData) {
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <Card className="max-w-xl border-primary/20 bg-card">
+                    <CardHeader>
+                        <CardTitle>Complete your TaxMate profile</CardTitle>
+                        <CardDescription>
+                            Your secure client workspace is ready. Finish onboarding to connect your CA and load your tax records.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4 sm:flex-row">
+                        <Link href="/onboarding/client">
+                            <Button className="w-full sm:w-auto">Start onboarding</Button>
+                        </Link>
+                        <Link href="/portal/support">
+                            <Button variant="outline" className="w-full sm:w-auto">Contact support</Button>
+                        </Link>
+                    </CardContent>
+                </Card>
             </div>
         );
     }

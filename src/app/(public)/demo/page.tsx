@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { Sparkles, Calendar, Clock, CheckCircle2, User, Building2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +17,6 @@ export default function DemoPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
-      <Navbar />
 
       <main className="flex-1 container mx-auto px-4 py-12 max-w-4xl space-y-8">
         <div className="text-center space-y-3">
@@ -77,7 +74,6 @@ export default function DemoPage() {
         )}
       </main>
 
-      <Footer />
     </div>
   );
 }

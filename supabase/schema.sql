@@ -1,6 +1,7 @@
 -- ============================================================================
 -- TaxMate - Enterprise Supabase Master Database Schema (v4.0)
--- Authoritative, production-ready single source of truth for Supabase DB setup
+-- Authoritative, production-ready single source of truth for Supabase DB setup.
+-- Keep this file tracked. Store local SQL experiments in *.sql.local files.
 
 CREATE OR REPLACE FUNCTION public.is_admin_user()
 RETURNS BOOLEAN
@@ -1206,22 +1207,6 @@ CREATE TABLE IF NOT EXISTS public.maintenance_subscribers (
 -- 10. COMPATIBILITY VIEWS
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public.profiles AS
-SELECT 
-  up.id,
-  up.user_id,
-  u.email,
-  u.name,
-  up.display_name,
-  u.avatar_url,
-  up.bio,
-  u.role::text AS role,
-  u.status::text AS status,
-  u.created_at,
-  u.updated_at
-FROM public.user_profiles up
-JOIN public.users u ON u.id = up.user_id;
-
 -- ============================================================================
 -- 11. INDEXES FOR HIGH-PERFORMANCE QUERYING
 -- ============================================================================
@@ -1500,7 +1485,19 @@ CREATE POLICY "Public Read Avatars" ON storage.objects FOR SELECT USING (bucket_
 CREATE POLICY "Authenticated Upload Avatars" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.role() = 'authenticated');
 CREATE POLICY "Public Read CA Assets" ON storage.objects FOR SELECT USING (bucket_id = 'ca-assets');
 CREATE POLICY "Authenticated Upload CA Assets" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'ca-assets' AND auth.role() = 'authenticated');
-CREATE POLICY "Authenticated Documents Access" ON storage.objects FOR ALL USING (bucket_id IN ('documents', 'invoice-pdfs', 'receipts', 'chat-files') AND auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "Authenticated Documents Access" ON storage.objects;
+CREATE POLICY "Users Manage Own Documents" ON storage.objects
+  FOR ALL
+  USING (
+    bucket_id IN ('documents', 'invoice-pdfs', 'receipts', 'chat-files')
+    AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  )
+  WITH CHECK (
+    bucket_id IN ('documents', 'invoice-pdfs', 'receipts', 'chat-files')
+    AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 -- ============================================================================
 -- 16. DEFAULT SYSTEM SEED DATA

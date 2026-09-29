@@ -28,24 +28,31 @@ export function WorkspaceSwitcher() {
 
   // Auto-detect active client from URL path
   useEffect(() => {
-    if (pathname.includes('/ca/clients/')) {
-      const parts = pathname.split('/ca/clients/');
-      const clientId = parts[1];
-      const match = clients.find((c) => c.id === clientId);
-      if (match) {
-        setSelectedClient(match);
-      }
+    const clientId = pathname.match(/^\/ca\/clients\/([^/]+)/)?.[1];
+    const match = clients.find((client) => client.id === clientId);
+    const storedClientId = window.localStorage.getItem('taxmate:selected-client');
+    const storedClient = clients.find((client) => client.id === storedClientId);
+
+    if (match) {
+      setSelectedClient(match);
+      window.localStorage.setItem('taxmate:selected-client', match.id);
+    } else if (pathname.startsWith('/ca') && storedClient) {
+      setSelectedClient(storedClient);
+    } else if (!pathname.startsWith('/ca')) {
+      setSelectedClient(null);
     }
   }, [pathname]);
 
   const handleSelectClient = (client: { id: string; name: string }) => {
     setSelectedClient(client);
+    window.localStorage.setItem('taxmate:selected-client', client.id);
     toast.success(`Switched to Client Workspace: ${client.name}`);
     router.push(`/ca/clients/${client.id}`);
   };
 
   const handleClearClient = () => {
     setSelectedClient(null);
+    window.localStorage.removeItem('taxmate:selected-client');
     toast.info('Switched back to CA Firm Master Dashboard');
     router.push('/ca/dashboard');
   };

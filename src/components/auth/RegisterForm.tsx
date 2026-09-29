@@ -84,9 +84,12 @@ export function RegisterForm({ initialRole = 'client' }: { initialRole?: 'client
 
     try {
       const mappedRole: UserRole = role === 'client' ? 'CLIENT' : role === 'ca' ? 'CA' : 'STAFF';
-      await signUp(values.email, values.password, values.fullName, mappedRole);
-      toast.success('Registration successful. Check your email to verify your account.');
-      router.push('/verify-email');
+      await signUp(values.email, values.password, values.fullName, mappedRole, {
+        phone: values.phone,
+        firmName: values.firmName || '',
+        membershipNumber: values.membershipNumber || '',
+        pan: values.pan || '',
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
       toast.error(message);

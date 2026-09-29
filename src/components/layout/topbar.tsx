@@ -59,7 +59,7 @@ export function TopBar() {
         </form>
 
         <div className="flex items-center gap-x-3 lg:gap-x-4">
-          <WorkspaceSwitcher />
+          {pathname.startsWith('/ca') && <WorkspaceSwitcher />}
           <ThemeToggle />
 
           {/* Interactive Notifications Bell Dropdown & Direct Link */}

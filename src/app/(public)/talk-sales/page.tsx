@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { PhoneCall, Mail, Building2, ShieldCheck, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +14,6 @@ export default function TalkSalesPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
-      <Navbar />
 
       <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
@@ -84,7 +81,6 @@ export default function TalkSalesPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

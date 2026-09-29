@@ -3,7 +3,7 @@ export type AppRole = 'SUPER_ADMIN' | 'CA' | 'CLIENT' | 'STAFF' | null;
 const ROLE_DASHBOARD_MAP: Record<Exclude<AppRole, null>, string> = {
   SUPER_ADMIN: '/admin/dashboard',
   CA: '/ca/dashboard',
-  CLIENT: '/client/dashboard',
+  CLIENT: '/portal/dashboard',
   STAFF: '/ca/dashboard',
 };
 

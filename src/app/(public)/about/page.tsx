@@ -1,7 +1,5 @@
 'use client';
 
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
 import { Building2, ShieldCheck, Users, Award, CheckCircle2, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,7 +7,6 @@ import { Button } from '@/components/ui/button';
 export default function AboutPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
-      <Navbar />
 
       <main className="flex-1 container mx-auto px-4 py-12 max-w-5xl space-y-12">
         {/* Hero */}
@@ -79,7 +76,6 @@ export default function AboutPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }
