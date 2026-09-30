@@ -3,52 +3,53 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { ArrowRight, Sparkles, PhoneCall } from "lucide-react";
+import { ArrowRight, Sparkles, Layers, Search } from "lucide-react";
 
 export function Navbar() {
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#0A0A0A]/90 backdrop-blur-xl">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="font-display font-extrabold text-xl tracking-tight flex items-center gap-2">
-          <span className="w-8 h-8 rounded-lg bg-lime-600 flex items-center justify-center text-white text-sm font-black shadow-md shadow-lime-600/30">
+        <Link href="/" className="font-display font-extrabold text-xl tracking-tight flex items-center gap-2.5">
+          <span className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white text-sm font-black shadow-[0_0_15px_rgba(5,150,105,0.4)]">
             T
           </span>
-          <span className="text-slate-900 dark:text-white">Tax<span className="text-lime-600 dark:text-lime-500">Mate</span></span>
+          <span className="text-white font-bold">Tax<span className="text-emerald-500">Mate</span></span>
         </Link>
         
         <div className="hidden lg:flex gap-6 items-center">
-          <Link href="/about" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors">
-            About Us
+          <Link href="/modules" className="inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all">
+            <Layers className="w-3.5 h-3.5 mr-1.5" /> All 20 Modules
           </Link>
-          <Link href="/pricing" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors">
+          <Link href="/pricing" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
             Pricing & Plans
           </Link>
-          <Link href="/faq" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors">
-            FAQ
+          <Link href="/client/dashboard" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
+            Customer Portal
           </Link>
-          <Link href="/talk-sales" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors flex items-center gap-1">
-            <PhoneCall className="w-3.5 h-3.5 text-lime-600" /> Talk to Sales
+          <Link href="/ca/dashboard" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
+            CA Portal
           </Link>
-          <Link href="/contact" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-lime-600 dark:hover:text-lime-400 transition-colors">
-            Contact Support
+          <Link href="/admin/dashboard" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
+            Admin Panel
+          </Link>
+          <Link href="/faq" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
+            FAQ & Docs
           </Link>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <ThemeToggle />
-          <Link href="/demo">
-            <Button variant="outline" size="sm" className="hidden sm:flex text-xs font-semibold border-slate-300 dark:border-slate-700">
-              <Sparkles className="w-3.5 h-3.5 mr-1.5 text-lime-600" /> Book Demo
-            </Button>
+          <Link href="/modules" className="flex lg:hidden text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <Layers className="w-3.5 h-3.5 mr-1" /> Modules
           </Link>
+          <ThemeToggle />
           <Link href="/login">
-            <Button variant="ghost" size="sm" className="text-xs font-semibold">
+            <Button variant="ghost" size="sm" className="text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/5">
               Log in
             </Button>
           </Link>
           <Link href="/register">
-            <Button size="sm" className="bg-lime-600 hover:bg-lime-500 text-white font-bold text-xs shadow-md shadow-lime-600/20">
-              Start 14-Day Free Trial <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-[0_0_20px_rgba(5,150,105,0.3)] transition-all hover:shadow-[0_0_30px_rgba(5,150,105,0.5)]">
+              Start Free Trial <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </Link>
         </div>

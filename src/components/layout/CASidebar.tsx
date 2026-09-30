@@ -24,33 +24,32 @@ import {
   Settings,
   MessageSquare,
   Video,
-  HelpCircle
+  HelpCircle,
+  Layers
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Dashboard", href: "/ca/dashboard", icon: LayoutDashboard },
-  { name: "Clients CRM", href: "/ca/clients", icon: Users },
-  { name: "Projects", href: "/ca/projects", icon: Briefcase },
-  { name: "Tasks List", href: "/ca/tasks", icon: CheckSquare },
-  { name: "Kanban Board", href: "/ca/tasks/kanban", icon: KanbanSquare },
+  { name: "All 20 Modules", href: "/modules", icon: Layers, highlight: true },
+  { name: "CA Dashboard", href: "/ca/dashboard", icon: LayoutDashboard },
+  { name: "Client Management", href: "/ca/clients", icon: Users },
+  { name: "Tax Work Dashboard", href: "/ca/income-tax", icon: FileSpreadsheet },
+  { name: "Tasks & Workflow", href: "/ca/tasks", icon: CheckSquare },
+  { name: "Tasks Kanban (6 Stages)", href: "/ca/tasks/kanban", icon: KanbanSquare },
   { name: "Document Vault", href: "/ca/documents", icon: FileText },
-  { name: "GST Returns & Notices", href: "/ca/gst", icon: ShieldCheck },
-  { name: "Income Tax & ITR", href: "/ca/income-tax", icon: FileSpreadsheet },
-  { name: "Compliance Calendar", href: "/ca/compliance", icon: Calendar },
+  { name: "GST Compliance & ITC", href: "/ca/gst", icon: ShieldCheck },
+  { name: "Appointments & Schedule", href: "/ca/appointments", icon: Calendar },
+  { name: "Real-Time Messages", href: "/ca/chat", icon: MessageSquare },
+  { name: "Video Consultations", href: "/ca/calls", icon: Video },
   { name: "Invoices & Billing", href: "/ca/invoices", icon: Receipt },
   { name: "Payments Received", href: "/ca/payments", icon: CreditCard },
-  { name: "CA Wallet", href: "/ca/wallet", icon: Wallet },
-  { name: "Ledger Accounting", href: "/ca/accounting", icon: BookOpen },
+  { name: "Firm Wallet & Payouts", href: "/ca/wallet", icon: Wallet },
+  { name: "Tax Calendar", href: "/ca/calendar", icon: Calendar },
   { name: "Analytics & Reports", href: "/ca/analytics", icon: BarChart3 },
+  { name: "Services & Fee Pricing", href: "/ca/services", icon: Briefcase },
   { name: "Client Reviews", href: "/ca/reviews", icon: Star },
-  { name: "Services & Fees", href: "/ca/services", icon: Briefcase },
-  { name: "AI Tax Assistant", href: "/ca/ai-assistant", icon: Bot },
-  { name: "Tax Calculator", href: "/ca/tax-calculator", icon: Calculator },
-  { name: "Live Chat", href: "/ca/chat", icon: MessageSquare },
-  { name: "Video Calls", href: "/ca/calls", icon: Video },
-  { name: "Notifications", href: "/ca/notifications", icon: Bell },
-  { name: "Settings", href: "/ca/settings", icon: Settings },
+  { name: "Public CA Profile", href: "/ca/profile", icon: Star },
+  { name: "Firm Settings", href: "/ca/settings", icon: Settings },
   { name: "Support Desk", href: "/ca/support", icon: HelpCircle },
 ];
 
@@ -58,36 +57,48 @@ export function CASidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full w-64 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-      <div className="flex h-16 shrink-0 items-center px-6 border-b border-slate-200 dark:border-slate-800">
-        <Link href="/ca/dashboard" className="font-display font-bold text-xl tracking-tight flex items-center gap-2">
-          <span className="w-8 h-8 rounded-lg bg-lime-600 flex items-center justify-center text-white text-sm font-extrabold">T</span>
-          Tax<span className="text-lime-600 dark:text-lime-500">Mate</span> <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1">CA Portal</span>
+    <div className="flex h-full w-64 flex-col border-r border-white/10 bg-[#0A0A0A] text-white">
+      <div className="flex h-16 shrink-0 items-center px-6 border-b border-white/10 bg-[#111111]/50 backdrop-blur-sm">
+        <Link href="/ca/dashboard" className="font-display font-bold text-xl tracking-tight flex items-center gap-2.5">
+          <span className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white text-sm font-black shadow-[0_0_15px_rgba(5,150,105,0.4)]">
+            T
+          </span>
+          <span className="text-white">Tax<span className="text-emerald-500">Mate</span></span>
+          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 ml-1">
+            CA Portal
+          </span>
         </Link>
       </div>
-      <div className="flex flex-1 flex-col overflow-y-auto pt-4 pb-6">
+      <div className="flex flex-1 flex-col overflow-y-auto pt-3 pb-6">
         <nav className="flex-1 space-y-1 px-3">
           {navigation.map((item) => {
-            const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/ca/dashboard");
+            const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/ca/dashboard" && item.href !== "/modules");
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
                   isActive
-                    ? "bg-lime-600/10 text-lime-700 dark:text-lime-400 font-semibold border-l-4 border-lime-600 pl-2"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100",
-                  "group flex items-center rounded-md px-3 py-2 text-xs font-medium transition-colors"
+                    ? "bg-emerald-500/10 text-emerald-400 font-semibold border-l-4 border-emerald-500 pl-2 shadow-[inset_0_0_12px_rgba(16,185,129,0.1)]"
+                    : item.highlight
+                    ? "text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20"
+                    : "text-gray-400 hover:bg-[#141414] hover:text-white",
+                  "group flex items-center rounded-xl px-3 py-2 text-xs font-medium transition-all"
                 )}
               >
                 <item.icon
                   className={cn(
-                    isActive ? "text-lime-600 dark:text-lime-400" : "text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200",
+                    isActive ? "text-emerald-400" : item.highlight ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300",
                     "mr-3 h-4 w-4 shrink-0 transition-colors"
                   )}
                   aria-hidden="true"
                 />
-                {item.name}
+                <span className="truncate">{item.name}</span>
+                {item.highlight && (
+                  <span className="ml-auto text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                    Hub
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -96,4 +107,5 @@ export function CASidebar() {
     </div>
   );
 }
+
 

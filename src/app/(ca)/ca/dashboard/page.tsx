@@ -1,4 +1,7 @@
-import CADashboardPage from '@/app/(ca)/dashboard/page';
+"use client";
 
-export { metadata } from '@/app/(ca)/dashboard/page';
-export default CADashboardPage;
+import { UnifiedCADashboard } from "@/components/ca/UnifiedCADashboard";
+
+export default function CADashboardPage() {
+  return <UnifiedCADashboard />;
+}

@@ -1,5 +1,8 @@
-import { ModulePage } from "@/components/shared/ModulePage";
+"use client";
 
-export default function SystemModulePage({ params }: { params: { path: string[] } }) {
-  return <ModulePage portal="Account" path={params.path} />;
+import { UnifiedSystemPages, SystemPageState } from "@/components/system/UnifiedSystemPages";
+
+export default function SystemCatchAllPage({ params }: { params: { path: string[] } }) {
+  const slug = params?.path?.[0] as SystemPageState | undefined;
+  return <UnifiedSystemPages initialState={slug || "loading"} />;
 }

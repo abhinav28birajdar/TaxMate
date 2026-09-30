@@ -38,15 +38,20 @@ export function HeroSection() {
           
           {/* Call to Actions */}
           <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 w-full sm:w-auto">
-            <Link href="/register" className="w-full sm:w-auto">
+            <Link href="/modules" className="w-full sm:w-auto">
               <button className="group w-full sm:w-auto h-14 flex items-center justify-center px-8 text-base font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-[0_0_20px_rgba(5,150,105,0.3)] transition-all hover:shadow-[0_0_30px_rgba(5,150,105,0.5)] hover:-translate-y-0.5 border-0">
-                Start Free Trial 
+                Explore All 20 Modules
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2 transition-transform group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </button>
             </Link>
-            <Link href="/contact" className="w-full sm:w-auto">
-              <button className="w-full sm:w-auto h-14 flex items-center justify-center px-8 text-base font-semibold bg-[#222222] hover:bg-[#333333] text-white rounded-xl transition-all hover:-translate-y-0.5 border-0">
-                Book a Demo
+            <Link href="/register" className="w-full sm:w-auto">
+              <button className="w-full sm:w-auto h-14 flex items-center justify-center px-8 text-base font-semibold bg-[#18181b] hover:bg-[#27272a] text-white border border-white/10 rounded-xl transition-all hover:-translate-y-0.5">
+                Start Free Trial
+              </button>
+            </Link>
+            <Link href="/client/dashboard" className="w-full sm:w-auto">
+              <button className="w-full sm:w-auto h-14 flex items-center justify-center px-6 text-sm font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl transition-all hover:-translate-y-0.5">
+                Customer Demo
               </button>
             </Link>
           </div>
