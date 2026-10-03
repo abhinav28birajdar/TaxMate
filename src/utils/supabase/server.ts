@@ -5,19 +5,15 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export async function createClient() {
-    const url = (supabaseUrl && supabaseUrl !== '' && !supabaseUrl.includes('PLACEHOLDER')) 
-        ? supabaseUrl 
-        : 'https://placeholder.supabase.co';
-
-    const key = (supabaseKey && supabaseKey !== '' && !supabaseKey.includes('placeholder')) 
-        ? supabaseKey 
-        : 'placeholder-anon-key';
+    if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('PLACEHOLDER') || supabaseKey.includes('placeholder')) {
+        throw new Error('Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    }
 
     const cookieStore = await cookies()
 
     return createServerClient(
-        url,
-        key,
+        supabaseUrl,
+        supabaseKey,
         {
             cookies: {
                 getAll() {

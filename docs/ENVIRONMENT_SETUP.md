@@ -328,7 +328,7 @@ Never expose publicly.
 
 1. Create a Supabase project.
 2. Copy `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
-3. Run `supabase/schema.sql` in the SQL editor.
+3. Run `supabase/complete_schema.sql` in the SQL editor.
 4. Enable the relevant auth providers in Supabase Auth.
 5. Configure redirect URLs for `/auth/callback`.
 6. Confirm RLS is enabled for the tables used by the app.

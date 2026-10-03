@@ -36,7 +36,7 @@ export default function PortalLoginPage() {
             toast.success('Access granted. Authenticated successfully.');
 
             // Check metadata role and direct accordingly
-            const userRole = data.user?.user_metadata?.role || 'client';
+            const userRole = data.user?.app_metadata?.role || 'client';
             
             if (userRole === 'client') {
                 const redirectTo = searchParams.get('redirectTo') || '/portal/dashboard';

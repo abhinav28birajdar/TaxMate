@@ -5,6 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     
     const userId = searchParams.get('userId');
@@ -13,7 +18,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const from = (page - 1) * limit;
 
+    if (userId && userId !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (!userId) {
+      searchParams.set('userId', user.id);
+    }
+
+    if (!searchParams.get('userId')) {
       return NextResponse.json(
         { error: 'userId is required' },
         { status: 400 }
@@ -23,7 +36,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('notifications')
       .select('*', { count: 'exact' })
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (unreadOnly) {

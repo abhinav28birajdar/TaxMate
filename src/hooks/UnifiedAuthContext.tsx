@@ -226,7 +226,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (data.session) {
           toast.success('Signed in successfully');
-          router.push(getDashboardPathForRole(data.user?.user_metadata?.role || role));
+          router.push(getDashboardPathForRole(data.user?.app_metadata?.role || role));
         }
       } catch (error) {
         throw error;
@@ -383,14 +383,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const enableTwoFactor = useCallback(async () => {
-    // Implementation would call backend API for 2FA setup
-    toast.info('2FA setup not yet implemented');
-    return { secret: '', qrCode: '' };
+    const response = await fetch('/api/auth/setup-2fa', { method: 'POST' });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || '2FA setup failed');
+    }
+    toast.success('Scan the QR code and enter the code to finish setup.');
+    return { secret: result.secret, qrCode: result.qrCode };
   }, []);
 
   const verifyTwoFactor = useCallback(async (token: string) => {
-    // Implementation would verify 2FA token with backend
-    toast.info('2FA verification not yet implemented');
+    const response = await fetch('/api/auth/verify-2fa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || '2FA verification failed');
+    }
+    toast.success('Two-factor authentication enabled.');
   }, []);
 
   const refreshSession = useCallback(async () => {

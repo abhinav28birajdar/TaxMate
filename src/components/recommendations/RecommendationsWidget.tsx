@@ -26,6 +26,7 @@ export const RecommendationsWidget = () => {
     const loadRecommendations = async () => {
       try {
         const response = await fetch('/api/recommendations?limit=5');
+        if (!response.ok) throw new Error('Failed to load recommendations');
         const data = await response.json();
         setRecommendations(data.data || []);
       } catch (error) {
@@ -50,13 +51,14 @@ export const RecommendationsWidget = () => {
 
   const handleDismiss = async (recommendationId: string) => {
     try {
-      await fetch('/api/recommendations/dismiss', {
+      const response = await fetch('/api/recommendations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recommendationId }),
       });
+      if (!response.ok) throw new Error('Failed to dismiss recommendation');
 
-      setRecommendations(recommendations.filter(r => r.id !== recommendationId));
+      setRecommendations(current => current.filter(r => r.id !== recommendationId));
     } catch (error) {
       console.error('Error dismissing recommendation:', error);
     }

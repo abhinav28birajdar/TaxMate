@@ -27,7 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "20 Modules Hub", href: "/modules", icon: Layers, highlight: true },
+  { name: "All 47 Modules Hub", href: "/modules", icon: Layers, highlight: true },
   { name: "Dashboard", href: "/admin/dashboard", icon: Activity },
   { name: "Users Management", href: "/admin/users", icon: Users },
   { name: "Customers Hub", href: "/admin/customers", icon: Users },

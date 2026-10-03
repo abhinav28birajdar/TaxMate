@@ -29,19 +29,22 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload file to Supabase storage
-    const fileName = `${caseId}/${Date.now()}-${file.name}`;
+    const fileName = `${user.id}/${caseId}/${Date.now()}-${file.name}`;
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('case-documents')
+      .from('documents')
       .upload(fileName, file);
 
     if (uploadError) {
       throw new Error(uploadError.message);
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('case-documents')
-      .getPublicUrl(uploadData.path);
+    const { data: urlData, error: urlError } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(uploadData.path, 3600);
+
+    if (urlError || !urlData?.signedUrl) {
+      throw new Error(urlError?.message || 'Failed to create document URL');
+    }
 
     // Create document record in database
     const { data: docData, error: docError } = await (supabase
@@ -49,15 +52,19 @@ export async function POST(req: NextRequest) {
       .insert([
         {
           case_id: caseId,
+          user_id: user.id,
           uploaded_by: user.id,
           name: file.name,
+          file_name: file.name,
           original_name: file.name,
-          file_url: urlData.publicUrl,
+          file_url: urlData.signedUrl,
           file_path: uploadData.path,
           file_type: file.type.split('/')[1],
           mime_type: file.type,
+          file_size: file.size,
           size: file.size,
           category,
+          document_type: category,
           description,
           status: 'draft',
           is_shared_with_ca: true,
@@ -76,7 +83,7 @@ export async function POST(req: NextRequest) {
         data: {
           id: docData.id,
           name: docData.name,
-          fileUrl: urlData.publicUrl,
+          fileUrl: urlData.signedUrl,
           category: docData.category,
         },
       },

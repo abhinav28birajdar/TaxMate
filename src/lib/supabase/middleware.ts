@@ -53,7 +53,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
-    const role = normalizeRole(user.user_metadata?.role || user.user_metadata?.user_role || null);
+    const role = normalizeRole(user.app_metadata?.role || user.app_metadata?.user_role || null);
     const dashboardPath = getDashboardPathForRole(role);
     const isPublicRoute = PUBLIC_ROUTES.some((route) =>
       route === '/' ? path === '/' : path === route || path.startsWith(`${route}/`)

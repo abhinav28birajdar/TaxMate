@@ -17,16 +17,38 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { ALL_47_SECTIONS } from "@/lib/directory/all-modules-data";
+
 interface SearchItem {
   id: string;
-  category: "Clients" | "Documents" | "Tax Returns" | "Messages" | "Transactions" | "Tasks";
+  category: "Clients" | "Documents" | "Tax Returns" | "Messages" | "Transactions" | "Tasks" | "Modules & Pages";
   title: string;
   subtitle: string;
   url: string;
   badge?: string;
 }
 
+const moduleSearchItems: SearchItem[] = ALL_47_SECTIONS.flatMap((sec) => [
+  {
+    id: `sec-${sec.id}`,
+    category: "Modules & Pages",
+    title: sec.title,
+    subtitle: sec.tagline,
+    url: sec.primaryHref,
+    badge: sec.badge,
+  },
+  ...sec.items.map((sub, sIdx) => ({
+    id: `sec-${sec.id}-sub-${sIdx}`,
+    category: "Modules & Pages" as const,
+    title: sub.name,
+    subtitle: `Part of ${sec.title}`,
+    url: sub.href,
+    badge: sec.badge,
+  })),
+]);
+
 const mockSearchItems: SearchItem[] = [
+  ...moduleSearchItems,
   // Clients
   { id: "c1", category: "Clients", title: "TechNova Solutions Pvt Ltd", subtitle: "GSTIN: 07AAAAA0000A1Z5 • Pro Audit Client", url: "/ca/clients/c1", badge: "Active CA Client" },
   { id: "c2", category: "Clients", title: "Ananya Deshmukh", subtitle: "PAN: ABCPD1234E • Salaried & Stock Trader", url: "/ca/clients/c2", badge: "ITR-2 Filing" },
@@ -81,7 +103,7 @@ export function GlobalSearchDialog({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  const categories = ["All", "Clients", "Documents", "Tax Returns", "Messages", "Transactions", "Tasks"];
+  const categories = ["All", "Modules & Pages", "Clients", "Documents", "Tax Returns", "Messages", "Transactions", "Tasks"];
 
   const filteredResults = mockSearchItems.filter((item) => {
     const matchesCat = activeCategory === "All" || item.category === activeCategory;

@@ -10,12 +10,10 @@ STABLE
 AS $$
 DECLARE
   app_role TEXT;
-  user_role_meta TEXT;
 BEGIN
   app_role := COALESCE(NULLIF(UPPER(auth.jwt() -> 'app_metadata' ->> 'role'), ''), '');
-  user_role_meta := COALESCE(NULLIF(UPPER(auth.jwt() -> 'user_metadata' ->> 'role'), ''), '');
 
-  RETURN app_role IN ('SUPER_ADMIN', 'ADMIN') OR user_role_meta IN ('SUPER_ADMIN', 'ADMIN');
+  RETURN app_role IN ('SUPER_ADMIN', 'ADMIN');
 END;
 $$;
 
@@ -603,13 +601,23 @@ CREATE TABLE IF NOT EXISTS public.time_entries (
 CREATE TABLE IF NOT EXISTS public.documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  uploaded_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
   ca_id UUID REFERENCES public.users(id),
   client_id UUID REFERENCES public.users(id),
+  case_id UUID REFERENCES public.cases(id) ON DELETE SET NULL,
+  name TEXT,
   file_name TEXT NOT NULL,
+  original_name TEXT,
+  file_path TEXT,
   file_type TEXT,
+  mime_type TEXT,
   file_size INTEGER,
+  size INTEGER,
   file_url TEXT NOT NULL,
   document_type TEXT,
+  category TEXT,
+  description TEXT,
+  is_shared_with_ca BOOLEAN NOT NULL DEFAULT FALSE,
   status TEXT DEFAULT 'active',
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -959,6 +967,17 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Recommendation dismissals
+CREATE TABLE IF NOT EXISTS public.recommendation_dismissals (
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  recommendation_id TEXT NOT NULL,
+  dismissed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, recommendation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recommendation_dismissals_user_id
+  ON public.recommendation_dismissals(user_id);
 
 -- Notification Preferences
 CREATE TABLE IF NOT EXISTS public.notification_preferences (
@@ -1374,6 +1393,7 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_read_receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.typing_indicators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recommendation_dismissals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_feed ENABLE ROW LEVEL SECURITY;
@@ -1426,6 +1446,9 @@ CREATE POLICY messages_access ON public.messages FOR ALL USING (
 );
 
 CREATE POLICY notifications_access ON public.notifications FOR ALL USING (user_id = auth.uid() OR auth.role() = 'service_role');
+CREATE POLICY recommendation_dismissals_access ON public.recommendation_dismissals FOR ALL
+  USING (user_id = auth.uid() OR public.is_admin_user())
+  WITH CHECK (user_id = auth.uid() OR public.is_admin_user());
 CREATE POLICY notification_prefs_access ON public.notification_preferences FOR ALL USING (user_id = auth.uid() OR auth.role() = 'service_role');
 CREATE POLICY security_alerts_access ON public.security_alerts FOR ALL USING (user_id = auth.uid() OR auth.role() = 'service_role');
 CREATE POLICY settings_access ON public.settings FOR ALL USING (user_id = auth.uid() OR auth.role() = 'service_role');

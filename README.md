@@ -496,7 +496,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 Open the Supabase SQL Editor and execute:
 
 ```text
-supabase/schema.sql
+supabase/complete_schema.sql
 ```
 
 This is the authoritative database schema for the application.
@@ -818,7 +818,7 @@ Add all required environment variables to your hosting provider.
 Use the production Supabase project and execute:
 
 ```text
-supabase/schema.sql
+supabase/complete_schema.sql
 ```
 
 ### 3. Configure Authentication
@@ -887,7 +887,7 @@ These routes can redirect users to the newer role-specific application surfaces 
 The canonical database schema is:
 
 ```text
-supabase/schema.sql
+supabase/complete_schema.sql
 ```
 
 It contains the application's core PostgreSQL structures, including:
@@ -986,7 +986,7 @@ Also verify the Supabase Auth redirect configuration.
 Verify that:
 
 ```text
-supabase/schema.sql
+supabase/complete_schema.sql
 ```
 
 has been executed successfully.

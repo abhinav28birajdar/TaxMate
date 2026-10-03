@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@lib/supabase/server';
-import AIRecommendationService from '@/lib/services/ai-recommendations-service';
+import { AIRecommendationService } from '@/lib/services/ai-recommendations-service';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const limit = req.nextUrl.searchParams.get('limit') || '5';
 
-    const aiService = AIRecommendationService;
+    const aiService = AIRecommendationService.getInstance(supabase);
     const recommendations = await aiService.getDashboardRecommendations(
       user.id,
       parseInt(limit)
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/recommendations/dismiss
+ * POST /api/recommendations
  * Dismiss a recommendation
  */
 export async function POST(req: NextRequest) {
@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const aiService = AIRecommendationService;
-    await aiService.dismissRecommendation(recommendationId);
+    const aiService = AIRecommendationService.getInstance(supabase);
+    await aiService.dismissRecommendation(recommendationId, user.id);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

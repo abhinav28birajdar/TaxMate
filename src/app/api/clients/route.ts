@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { clientService } from '@/lib/client-service'
+import { createServerSupabaseClient } from '@lib/supabase/server'
+
+async function getAuthorizedCA() {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return { supabase, user: null }
+
+  const role = String(user.app_metadata?.role || '').toUpperCase()
+  if (!['CA', 'STAFF', 'SUPER_ADMIN'].includes(role)) return { supabase, user: null }
+  return { supabase, user }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const caId = request.headers.get('x-ca-id')
-    if (!caId) {
+    const { user } = await getAuthorizedCA()
+    if (!user) {
       return NextResponse.json(
-        { error: 'CA ID required' },
+        { error: 'Unauthorized' },
         { status: 401 }
       )
     }
+    const caId = user.id
 
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || undefined
@@ -38,13 +50,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const caId = request.headers.get('x-ca-id')
-    if (!caId) {
+    const { user } = await getAuthorizedCA()
+    if (!user) {
       return NextResponse.json(
-        { error: 'CA ID required' },
+        { error: 'Unauthorized' },
         { status: 401 }
       )
     }
+    const caId = user.id
 
     const body = await request.json()
     const client = await clientService.createClient(caId, body)

@@ -115,7 +115,7 @@ export async function updateSession(request: NextRequest) {
 
         // Authenticated user
         if (user) {
-            const userRole = user.user_metadata?.role || 'client';
+            const userRole = user.app_metadata?.role || 'client';
 
             // Trying to access public auth pages (login, register, portal login)
             if (pathname.startsWith('/login') || pathname.startsWith('/register') || pathname === '/portal/login') {

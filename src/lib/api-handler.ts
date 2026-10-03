@@ -30,8 +30,8 @@ export function createProtectedHandler(
 
             // Auth check
             const supabase = await createClient();
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-            if (sessionError || !session?.user) {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
             }
 
@@ -39,10 +39,10 @@ export function createProtectedHandler(
             const { data: userProfile } = await supabase
                 .from('users')
                 .select('role')
-                .eq('id', session.user.id)
+                .eq('id', user.id)
                 .single();
 
-            const userRole = userProfile?.role || session.user.user_metadata?.role || 'CLIENT';
+            const userRole = userProfile?.role || user.app_metadata?.role || 'CLIENT';
 
             // Role check
             if (options.roles && !options.roles.includes(userRole)) {
@@ -50,9 +50,9 @@ export function createProtectedHandler(
             }
 
             return await handler(req, {
-                userId: session.user.id,
+                userId: user.id,
                 userRole,
-                session,
+                session: { user },
             });
         } catch (error) {
             Sentry.captureException(error);

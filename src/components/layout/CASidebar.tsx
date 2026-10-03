@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "All 20 Modules", href: "/modules", icon: Layers, highlight: true },
+  { name: "All 47 Modules", href: "/modules", icon: Layers, highlight: true },
   { name: "CA Dashboard", href: "/ca/dashboard", icon: LayoutDashboard },
   { name: "Client Management", href: "/ca/clients", icon: Users },
   { name: "Tax Work Dashboard", href: "/ca/income-tax", icon: FileSpreadsheet },

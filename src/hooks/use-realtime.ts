@@ -20,14 +20,15 @@ export function useRealtimeSubscription<T>(
   onInsert?: (record: T) => void,
   onUpdate?: (record: T) => void,
   onDelete?: (record: T) => void,
-  dependencies?: any[]
+  _dependencies?: unknown[]
 ) {
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const callbacksRef = useRef({ onInsert, onUpdate, onDelete });
+  callbacksRef.current = { onInsert, onUpdate, onDelete };
 
   useEffect(() => {
     const supabase = createClient();
-    const channelName = `${table}-${Date.now()}`;
+    const channelName = `realtime-${table}-${filter || 'all'}`;
 
     // Create channel
     const channel = supabase
@@ -41,7 +42,7 @@ export function useRealtimeSubscription<T>(
           ...(filter && { filter }),
         },
         (payload) => {
-          onInsert?.(payload.new as T);
+          callbacksRef.current.onInsert?.(payload.new as T);
         }
       )
       .on(
@@ -53,7 +54,7 @@ export function useRealtimeSubscription<T>(
           ...(filter && { filter }),
         },
         (payload) => {
-          onUpdate?.(payload.new as T);
+          callbacksRef.current.onUpdate?.(payload.new as T);
         }
       )
       .on(
@@ -65,7 +66,7 @@ export function useRealtimeSubscription<T>(
           ...(filter && { filter }),
         },
         (payload) => {
-          onDelete?.(payload.old as T);
+          callbacksRef.current.onDelete?.(payload.old as T);
         }
       );
 
@@ -74,14 +75,10 @@ export function useRealtimeSubscription<T>(
       setIsSubscribed(status === 'SUBSCRIBED');
     });
 
-    channelRef.current = channel;
-
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
+      void supabase.removeChannel(channel);
     };
-  }, dependencies || [table, filter]);
+  }, [table, filter]);
 
   return isSubscribed;
 }

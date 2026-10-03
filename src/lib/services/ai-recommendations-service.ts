@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/utils/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface AIRecommendation {
   id: string;
@@ -20,13 +21,20 @@ export interface AIRecommendation {
   dismissed: boolean;
 }
 
+function getRecommendationId(type: AIRecommendation['type'], targetUserId: string, title: string, relatedEntityId?: string) {
+  return [type, targetUserId, relatedEntityId || '', title].join(':');
+}
+
 export class AIRecommendationService {
   private static instance: AIRecommendationService;
-  private supabase = createClient();
+  private supabase: SupabaseClient;
 
-  private constructor() {}
+  private constructor(supabase: SupabaseClient = createClient()) {
+    this.supabase = supabase;
+  }
 
-  static getInstance(): AIRecommendationService {
+  static getInstance(supabase?: SupabaseClient): AIRecommendationService {
+    if (supabase) return new AIRecommendationService(supabase);
     if (!AIRecommendationService.instance) {
       AIRecommendationService.instance = new AIRecommendationService();
     }
@@ -68,7 +76,7 @@ export class AIRecommendationService {
       // If CA has high experience in tax, recommend tax services
       if (caProfile.years_of_experience >= 5 && !existingServiceCodes.includes('TAX_OPTIMIZATION')) {
         recommendations.push({
-          id: 'rec_' + Date.now(),
+          id: getRecommendationId('service', caProfile.user_id, 'Add Tax Optimization Service'),
           type: 'service',
           title: 'Add Tax Optimization Service',
           description: 'Based on your experience and client demand, consider offering tax optimization services',
@@ -84,7 +92,7 @@ export class AIRecommendationService {
       // If CA has many GST cases, recommend GST services
       if (requestedServiceTypes.includes('GST_RETURN')) {
         recommendations.push({
-          id: 'rec_' + (Date.now() + 1),
+          id: getRecommendationId('service', caProfile.user_id, 'Premium GST Services Package'),
           type: 'service',
           title: 'Premium GST Services Package',
           description: 'Your clients frequently request GST services. Create a comprehensive package',
@@ -119,10 +127,11 @@ export class AIRecommendationService {
       const recommendations: AIRecommendation[] = [];
 
       // If client is a business, recommend business tax services
-      if (clientProfile.is_business) {
-        if (clientProfile.business_gstin && !clientProfile.gstin) {
+      const isBusiness = Boolean(clientProfile.business_name);
+      if (isBusiness) {
+        if (!clientProfile.gstin) {
           recommendations.push({
-            id: 'rec_' + Date.now(),
+            id: getRecommendationId('compliance', clientProfile.user_id, 'GST Registration Required'),
             type: 'compliance',
             title: 'GST Registration Required',
             description: 'Your business seems to have GST liability. Please ensure proper GST registration',
@@ -138,7 +147,7 @@ export class AIRecommendationService {
         // If business has high turnover, recommend audit services
         if (clientProfile.annual_turnover && clientProfile.annual_turnover > 10000000) {
           recommendations.push({
-            id: 'rec_' + (Date.now() + 1),
+            id: getRecommendationId('compliance', clientProfile.user_id, 'Statutory Audit Recommended'),
             type: 'compliance',
             title: 'Statutory Audit Recommended',
             description: 'Based on your business turnover, statutory audit is recommended',
@@ -153,7 +162,7 @@ export class AIRecommendationService {
 
       // ITR filing recommendation (fiscal year)
       recommendations.push({
-        id: 'rec_' + (Date.now() + 2),
+        id: getRecommendationId('compliance', clientProfile.user_id, 'Income Tax Return Filing Due Soon'),
         type: 'compliance',
         title: 'Income Tax Return Filing Due Soon',
         description: 'ITR filing deadline is approaching',
@@ -187,9 +196,10 @@ export class AIRecommendationService {
       const recommendations: AIRecommendation[] = [];
 
       // If individual with income, recommend tax planning
-      if (!clientProfile.is_business) {
+      const isBusiness = Boolean(clientProfile.business_name);
+      if (!isBusiness) {
         recommendations.push({
-          id: 'rec_' + Date.now(),
+          id: getRecommendationId('tax_optimization', clientProfile.user_id, 'Tax Planning Opportunity'),
           type: 'tax_optimization',
           title: 'Tax Planning Opportunity',
           description: 'Explore tax deductions under Section 80C, 80D, etc.',
@@ -203,9 +213,9 @@ export class AIRecommendationService {
       }
 
       // Business tax optimization
-      if (clientProfile.is_business) {
+      if (isBusiness) {
         recommendations.push({
-          id: 'rec_' + (Date.now() + 1),
+          id: getRecommendationId('tax_optimization', clientProfile.user_id, 'Business Tax Optimization'),
           type: 'tax_optimization',
           title: 'Business Tax Optimization',
           description: 'Review expense deductions and tax planning strategies',
@@ -239,10 +249,10 @@ export class AIRecommendationService {
 
       const { data: uploadedDocuments } = await this.supabase
         .from('documents')
-        .select('category')
+        .select('document_type')
         .eq('case_id', caseId);
 
-      const uploadedCategories = uploadedDocuments?.map(d => d.category) || [];
+      const uploadedCategories = uploadedDocuments?.map(d => d.document_type) || [];
       const recommendations: AIRecommendation[] = [];
 
       // Recommend missing documents based on service type
@@ -257,7 +267,7 @@ export class AIRecommendationService {
 
       if (missing.length > 0) {
         recommendations.push({
-          id: 'rec_' + Date.now(),
+            id: getRecommendationId('document', caseData.client_id, `Missing Documents Required for ${caseData.service_type}`, caseId),
           type: 'document',
           title: `Missing Documents Required for ${caseData.service_type}`,
           description: `Please upload: ${missing.join(', ')}`,
@@ -299,7 +309,7 @@ export class AIRecommendationService {
       // If deadline is approaching
       if (daysLeft < 7 && daysLeft > 0) {
         recommendations.push({
-          id: 'rec_' + Date.now(),
+          id: getRecommendationId('action', caseData.ca_id, 'Case Deadline Approaching', caseId),
           type: 'action',
           title: 'Case Deadline Approaching',
           description: `Only ${daysLeft} days left to complete this case`,
@@ -319,7 +329,7 @@ export class AIRecommendationService {
 
       if (caseData.status === 'in_progress' && daysPassed > 30) {
         recommendations.push({
-          id: 'rec_' + (Date.now() + 1),
+          id: getRecommendationId('action', caseData.ca_id, 'Case In Progress For Extended Period', caseId),
           type: 'action',
           title: 'Case In Progress For Extended Period',
           description: 'This case has been in progress for over a month. Consider expediting completion.',
@@ -381,7 +391,13 @@ export class AIRecommendationService {
         }
       }
 
-      return recommendations.filter(r => !r.dismissed);
+      const { data: dismissals } = await this.supabase
+        .from('recommendation_dismissals')
+        .select('recommendation_id')
+        .eq('user_id', userId);
+      const dismissedIds = new Set(dismissals?.map(item => item.recommendation_id) || []);
+
+      return recommendations.filter(r => !r.dismissed && !dismissedIds.has(r.id));
     } catch (error) {
       console.error('Error fetching user recommendations:', error);
       return [];
@@ -391,11 +407,20 @@ export class AIRecommendationService {
   /**
    * Dismiss a recommendation
    */
-  async dismissRecommendation(recommendationId: string): Promise<void> {
-    // Store in local storage or database
-    const dismissed = JSON.parse(localStorage.getItem('dismissed_recommendations') || '[]');
-    dismissed.push(recommendationId);
-    localStorage.setItem('dismissed_recommendations', JSON.stringify(dismissed));
+  async dismissRecommendation(recommendationId: string, userId?: string): Promise<void> {
+    if (userId) {
+      const { error } = await this.supabase
+        .from('recommendation_dismissals')
+        .upsert({ user_id: userId, recommendation_id: recommendationId }, { onConflict: 'user_id,recommendation_id' });
+      if (error) throw error;
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      const dismissed = JSON.parse(window.localStorage.getItem('dismissed_recommendations') || '[]');
+      if (!dismissed.includes(recommendationId)) dismissed.push(recommendationId);
+      window.localStorage.setItem('dismissed_recommendations', JSON.stringify(dismissed));
+    }
   }
 
   /**
