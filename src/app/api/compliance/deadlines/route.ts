@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@lib/supabase/server';
-import ComplianceService from '@/lib/services/compliance-service';
+import { ComplianceService } from '@/lib/services/compliance-service';
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     const status = req.nextUrl.searchParams.get('status');
     const deadlineType = req.nextUrl.searchParams.get('type');
 
-    const complianceService = ComplianceService;
+    const complianceService = new ComplianceService(supabase);
     const deadlines = await complianceService.getDeadlines(user.id, {
       status: status || undefined,
       deadline_type: deadlineType || undefined,
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const complianceService = ComplianceService;
+    const complianceService = new ComplianceService(supabase);
     const deadline = await complianceService.createDeadline({
       title,
       deadline_type: deadlineType,

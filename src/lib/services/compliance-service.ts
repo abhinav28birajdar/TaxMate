@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@/utils/supabase/client';
-import { createServerSupabaseClient } from '@lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface ComplianceDeadline {
   id: string;
@@ -31,9 +31,19 @@ export interface ComplianceAutomationRule {
 
 export class ComplianceService {
   private static instance: ComplianceService;
-  private supabase = createClient();
+  private supabase: SupabaseClient | null;
 
-  private constructor() {}
+  constructor(supabase?: SupabaseClient) {
+    this.supabase = supabase ?? null;
+  }
+
+  private getSupabase(): SupabaseClient {
+    if (!this.supabase) {
+      this.supabase = createClient();
+    }
+
+    return this.supabase;
+  }
 
   static getInstance(): ComplianceService {
     if (!ComplianceService.instance) {
@@ -51,7 +61,7 @@ export class ComplianceService {
     startDate?: string;
     endDate?: string;
   }): Promise<ComplianceDeadline[]> {
-    let query = this.supabase
+    let query = this.getSupabase()
       .from('compliance_deadlines')
       .select('*');
 
@@ -88,7 +98,7 @@ export class ComplianceService {
     const today = new Date();
     const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_deadlines')
       .select('*')
       .eq('status', 'pending')
@@ -106,7 +116,7 @@ export class ComplianceService {
   async getOverdueDeadlines(userId: string): Promise<ComplianceDeadline[]> {
     const today = new Date().toISOString().split('T')[0];
 
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_deadlines')
       .select('*')
       .eq('status', 'pending')
@@ -120,7 +130,7 @@ export class ComplianceService {
    * Create a compliance deadline
    */
   async createDeadline(deadline: Omit<ComplianceDeadline, 'id'>): Promise<ComplianceDeadline> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_deadlines')
       .insert([deadline])
       .select()
@@ -138,7 +148,7 @@ export class ComplianceService {
     status: string,
     completedAt?: string
   ): Promise<ComplianceDeadline> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_deadlines')
       .update({
         status,
@@ -157,7 +167,7 @@ export class ComplianceService {
    * Get compliance calendar for a year
    */
   async getComplianceCalendar(financialYear: string): Promise<any[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_calendar')
       .select('*')
       .eq('financial_year', financialYear)
@@ -171,7 +181,7 @@ export class ComplianceService {
    * Set up automation rules for compliance tracking
    */
   async createAutomationRule(rule: Omit<ComplianceAutomationRule, 'id'>): Promise<ComplianceAutomationRule> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_automation_rules')
       .insert([rule])
       .select()
@@ -185,7 +195,7 @@ export class ComplianceService {
    * Get automation rules for a CA
    */
   async getAutomationRules(caId: string): Promise<ComplianceAutomationRule[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_automation_rules')
       .select('*')
       .eq('ca_id', caId)
@@ -222,7 +232,7 @@ export class ComplianceService {
     overdue: number;
     completionRate: number;
   }> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_deadlines')
       .select('status', { count: 'exact' });
 
@@ -262,7 +272,7 @@ export class ComplianceService {
    * Get compliance summary for a client
    */
   async getClientComplianceSummary(clientId: string): Promise<any> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('compliance_deadlines')
       .select('deadline_type, status')
       .eq('client_id', clientId);
