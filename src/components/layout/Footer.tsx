@@ -28,7 +28,6 @@ export function Footer() {
             <li><Link href="/about" className="hover:text-lime-600 dark:hover:text-lime-400">About Us</Link></li>
             <li><Link href="/pricing" className="hover:text-lime-600 dark:hover:text-lime-400">Pricing & Plans</Link></li>
             <li><Link href="/faq" className="hover:text-lime-600 dark:hover:text-lime-400">Frequently Asked Questions</Link></li>
-            <li><Link href="/demo" className="hover:text-lime-600 dark:hover:text-lime-400">Book Live Product Demo</Link></li>
             <li><Link href="/talk-sales" className="hover:text-lime-600 dark:hover:text-lime-400">Talk to Sales</Link></li>
           </ul>
         </div>

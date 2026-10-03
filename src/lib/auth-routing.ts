@@ -37,7 +37,6 @@ export const PUBLIC_ROUTES = [
   '/landing',
   '/about',
   '/contact',
-  '/demo',
   '/faq',
   '/help',
   '/maintenance',

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@lib/supabase/server';
-import ESignatureService from '@/lib/services/esignature-service';
+import { ESignatureService } from '@/lib/services/esignature-service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const esignatureService = ESignatureService;
+    const esignatureService = new ESignatureService(supabase);
     const request = await esignatureService.createSignatureRequest(
       documentId,
       user.id,
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     const type = req.nextUrl.searchParams.get('type') || 'pending';
 
-    const esignatureService = ESignatureService;
+    const esignatureService = new ESignatureService(supabase);
 
     if (type === 'pending') {
       const requests = await esignatureService.getPendingSignatures(user.id);
@@ -101,7 +101,7 @@ async function signDocument(req: NextRequest) {
       );
     }
 
-    const esignatureService = ESignatureService;
+    const esignatureService = new ESignatureService(supabase);
     const signed = await esignatureService.signDocument(
       signatureRequestId,
       signatureUrl,

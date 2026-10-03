@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/utils/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface ESignatureRequest {
   id: string;
@@ -20,9 +21,19 @@ export interface ESignatureRequest {
 
 export class ESignatureService {
   private static instance: ESignatureService;
-  private supabase = createClient();
+  private supabase: SupabaseClient | null;
 
-  private constructor() {}
+  constructor(supabase?: SupabaseClient) {
+    this.supabase = supabase ?? null;
+  }
+
+  private getSupabase(): SupabaseClient {
+    if (!this.supabase) {
+      this.supabase = createClient();
+    }
+
+    return this.supabase;
+  }
 
   static getInstance(): ESignatureService {
     if (!ESignatureService.instance) {
@@ -44,7 +55,7 @@ export class ESignatureService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30 days validity
 
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('esignature_requests')
       .insert([
         {
@@ -68,7 +79,7 @@ export class ESignatureService {
    * Get pending signature requests for a user
    */
   async getPendingSignatures(userId: string): Promise<ESignatureRequest[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('esignature_requests')
       .select('*')
       .eq('signer_id', userId)
@@ -86,12 +97,12 @@ export class ESignatureService {
     sent: ESignatureRequest[];
     received: ESignatureRequest[];
   }> {
-    const { data: sent, error: sentError } = await this.supabase
+    const { data: sent, error: sentError } = await this.getSupabase()
       .from('esignature_requests')
       .select('*')
       .eq('requester_id', userId);
 
-    const { data: received, error: receivedError } = await this.supabase
+    const { data: received, error: receivedError } = await this.getSupabase()
       .from('esignature_requests')
       .select('*')
       .eq('signer_id', userId);
@@ -108,7 +119,7 @@ export class ESignatureService {
    * Verify PAN for signature
    */
   async verifyPAN(userId: string, panNumber: string): Promise<boolean> {
-    const { data: clientProfile } = await this.supabase
+    const { data: clientProfile } = await this.getSupabase()
       .from('client_profiles')
       .select('pan_number')
       .eq('user_id', userId)
@@ -125,7 +136,7 @@ export class ESignatureService {
   async verifyOTP(signatureRequestId: string, otp: string): Promise<boolean> {
     // In production, integrate with actual OTP provider
     // For now, we'll simulate verification
-    const { error } = await this.supabase
+    const { error } = await this.getSupabase()
       .from('esignature_requests')
       .update({ otp_verified: true })
       .eq('id', signatureRequestId);
@@ -141,7 +152,7 @@ export class ESignatureService {
     signatureUrl: string,
     signerId: string
   ): Promise<ESignatureRequest> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('esignature_requests')
       .update({
         status: 'signed',
@@ -156,7 +167,7 @@ export class ESignatureService {
 
     // Update document status
     if (data) {
-      await this.supabase
+      await this.getSupabase()
         .from('documents')
         .update({ status: 'signed' })
         .eq('id', data.document_id);
@@ -169,7 +180,7 @@ export class ESignatureService {
    * Reject a signature request
    */
   async rejectSignatureRequest(signatureRequestId: string, reason?: string): Promise<void> {
-    const { error } = await this.supabase
+    const { error } = await this.getSupabase()
       .from('esignature_requests')
       .update({
         status: 'rejected',
@@ -184,7 +195,7 @@ export class ESignatureService {
    * Get signature request details
    */
   async getSignatureRequest(signatureRequestId: string): Promise<ESignatureRequest> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('esignature_requests')
       .select('*')
       .eq('id', signatureRequestId)
@@ -208,7 +219,7 @@ export class ESignatureService {
    * Get signed documents for a user
    */
   async getSignedDocuments(userId: string): Promise<any[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('documents')
       .select('*')
       .eq('uploaded_by', userId)
@@ -223,7 +234,7 @@ export class ESignatureService {
    * Download signed document
    */
   async downloadSignedDocument(documentId: string): Promise<string> {
-    const { data: document } = await this.supabase
+    const { data: document } = await this.getSupabase()
       .from('documents')
       .select('file_path')
       .eq('id', documentId)
@@ -231,7 +242,7 @@ export class ESignatureService {
 
     if (!document) throw new Error('Document not found');
 
-    const { data } = this.supabase.storage
+    const { data } = this.getSupabase().storage
       .from('case-documents')
       .getPublicUrl(document.file_path);
 
@@ -258,7 +269,7 @@ export class ESignatureService {
       expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     }));
 
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('esignature_requests')
       .insert(signatureRequests)
       .select();
@@ -271,7 +282,7 @@ export class ESignatureService {
    * Get signature request history for a document
    */
   async getDocumentSignatureHistory(documentId: string): Promise<ESignatureRequest[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await this.getSupabase()
       .from('esignature_requests')
       .select('*')
       .eq('document_id', documentId)

@@ -51,7 +51,7 @@ export function HeroSection() {
             </Link>
             <Link href="/client/dashboard" className="w-full sm:w-auto">
               <button className="w-full sm:w-auto h-14 flex items-center justify-center px-6 text-sm font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl transition-all hover:-translate-y-0.5">
-                Customer Demo
+                Open Customer Portal
               </button>
             </Link>
           </div>

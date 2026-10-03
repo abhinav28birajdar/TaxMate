@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/utils/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface CaseMetrics {
   caseId: string;
@@ -39,9 +40,23 @@ export interface ClientEngagement {
 
 export class AnalyticsService {
   private static instance: AnalyticsService;
-  private supabase = createClient();
+  private client: SupabaseClient | null;
 
-  private constructor() {}
+  constructor(supabase?: SupabaseClient) {
+    this.client = supabase ?? null;
+  }
+
+  private getSupabase(): SupabaseClient {
+    if (!this.client) {
+      this.client = createClient();
+    }
+
+    return this.client;
+  }
+
+  private get supabase(): SupabaseClient {
+    return this.getSupabase();
+  }
 
   static getInstance(): AnalyticsService {
     if (!AnalyticsService.instance) {

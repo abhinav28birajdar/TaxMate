@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/utils/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface TaxFormTemplate {
   id: string;
@@ -33,9 +34,23 @@ export interface ClientTaxForm {
 
 export class TaxFormService {
   private static instance: TaxFormService;
-  private supabase = createClient();
+  private client: SupabaseClient | null;
 
-  private constructor() {}
+  constructor(supabase?: SupabaseClient) {
+    this.client = supabase ?? null;
+  }
+
+  private getSupabase(): SupabaseClient {
+    if (!this.client) {
+      this.client = createClient();
+    }
+
+    return this.client;
+  }
+
+  private get supabase(): SupabaseClient {
+    return this.getSupabase();
+  }
 
   static getInstance(): TaxFormService {
     if (!TaxFormService.instance) {

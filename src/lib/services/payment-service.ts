@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@/utils/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface Invoice {
   id: string;
@@ -37,10 +38,24 @@ export interface Payment {
 
 export class PaymentService {
   private static instance: PaymentService;
-  private supabase = createClient();
+  private client: SupabaseClient | null;
   private razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
-  private constructor() {}
+  constructor(supabase?: SupabaseClient) {
+    this.client = supabase ?? null;
+  }
+
+  private getSupabase(): SupabaseClient {
+    if (!this.client) {
+      this.client = createClient();
+    }
+
+    return this.client;
+  }
+
+  private get supabase(): SupabaseClient {
+    return this.getSupabase();
+  }
 
   static getInstance(): PaymentService {
     if (!PaymentService.instance) {
