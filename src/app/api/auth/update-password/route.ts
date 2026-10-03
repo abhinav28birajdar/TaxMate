@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as bcrypt from 'bcryptjs';
 import { getServiceClient } from '../../../../lib/backend/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = getServiceClient();

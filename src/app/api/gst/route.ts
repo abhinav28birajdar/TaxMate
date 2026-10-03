@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '../../../lib/backend/supabase';
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/gst - Get all GST records for CA
 export async function GET(request: NextRequest) {
   try {

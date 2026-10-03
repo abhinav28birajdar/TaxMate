@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '../../../lib/backend/supabase';
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/compliance - Get all compliance items
 export async function GET(request: NextRequest) {
   try {

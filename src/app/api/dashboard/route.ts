@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '../../../lib/backend/supabase';
 
+export const dynamic = 'force-dynamic';
+
 // GET - Get dashboard data
 export async function GET(request: NextRequest) {
   try {
