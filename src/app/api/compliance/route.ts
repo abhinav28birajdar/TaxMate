@@ -1,15 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient } from '../../../lib/backend/supabase';
+import { getServiceClient } from '@/lib/backend/supabase';
+import {
+  canAccessClientRecord,
+  getResolvedClientIdsForUser,
+  getSessionUser,
+} from '@/lib/api/server-auth';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/compliance - Get all compliance items
+const PRIORITY_MAP: Record<string, string> = {
+  low: 'LOW',
+  medium: 'MEDIUM',
+  high: 'HIGH',
+  urgent: 'URGENT',
+};
+
+function formatComplianceItem(item: any) {
+  return {
+    ...item,
+    type: item.compliance_type,
+    priority: item.priority?.toLowerCase(),
+    checklist: item.metadata?.checklist || item.document_checklist || [],
+    documents: item.metadata?.documents || [],
+    frequency: item.metadata?.frequency || 'once',
+  };
+}
+
+// GET /api/compliance - Get compliance items scoped to the caller
 export async function GET(request: NextRequest) {
   try {
+    const auth = await getSessionUser(request);
+    if (!auth) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const supabase = getServiceClient();
     const { searchParams } = new URL(request.url);
-    const caId = searchParams.get('caId');
-    const clientId = searchParams.get('clientId');
+    const requestedCaId = searchParams.get('caId');
+    const requestedClientId = searchParams.get('clientId');
     const status = searchParams.get('status');
     const overdueOnly = searchParams.get('overdueOnly') === 'true';
 
@@ -18,8 +46,26 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('due_date', { ascending: true });
 
-    if (caId) query = query.eq('ca_id', caId);
-    if (clientId) query = query.eq('client_id', clientId);
+    if (requestedClientId) {
+      const allowed = await canAccessClientRecord(auth, requestedClientId);
+      if (!allowed) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
+      query = query.eq('client_id', requestedClientId);
+    } else if (requestedCaId) {
+      if (requestedCaId !== auth.userId && !auth.isAdmin) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
+      query = query.eq('ca_id', requestedCaId);
+    } else if (!auth.isAdmin) {
+      if (auth.role === 'CLIENT') {
+        const clientIds = await getResolvedClientIdsForUser(auth.userId);
+        query = query.in('client_id', clientIds);
+      } else {
+        query = query.or(`ca_id.eq.${auth.userId},assigned_to.eq.${auth.userId}`);
+      }
+    }
+
     if (status) query = query.eq('status', status.toLowerCase());
     if (overdueOnly) {
       query = query
@@ -28,20 +74,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await query;
-
     if (error) throw error;
 
-    // Format for caller compatibility
-    const items = (data || []).map((item) => ({
-      ...item,
-      type: item.compliance_type,
-      priority: item.priority?.toLowerCase(),
-      checklist: item.metadata?.checklist || item.document_checklist || [],
-      documents: item.metadata?.documents || [],
-      frequency: item.metadata?.frequency || 'once',
-    }));
-
-    return NextResponse.json({ success: true, data: items });
+    return NextResponse.json({
+      success: true,
+      data: (data || []).map(formatComplianceItem),
+    });
   } catch (error) {
     console.error('Compliance GET error:', error);
     return NextResponse.json(
@@ -54,27 +92,48 @@ export async function GET(request: NextRequest) {
 // POST /api/compliance - Create compliance item
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getServiceClient();
-    const body = await request.json();
+    const auth = await getSessionUser(request);
+    if (!auth) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const priorityMap: Record<string, string> = {
-      'low': 'LOW',
-      'medium': 'MEDIUM',
-      'high': 'HIGH',
-      'urgent': 'URGENT',
-    };
-    const dbPriority = priorityMap[body.priority?.toLowerCase()] || 'MEDIUM';
+    const body = await request.json();
+    const targetClientId = body.clientId || body.client_id;
+    const title = String(body.title || '').trim();
+    const dueDate = body.dueDate || body.due_date;
+
+    if (!title || !dueDate) {
+      return NextResponse.json(
+        { success: false, error: 'Title and due date are required' },
+        { status: 400 }
+      );
+    }
+
+    if (targetClientId) {
+      const allowed = await canAccessClientRecord(auth, targetClientId);
+      if (!allowed) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
+    } else if (!auth.isCAOrStaff) {
+      return NextResponse.json(
+        { success: false, error: 'Client ID or CA role is required' },
+        { status: 403 }
+      );
+    }
+
+    const dbPriority = PRIORITY_MAP[String(body.priority || '').toLowerCase()] || 'MEDIUM';
+    const supabase = getServiceClient();
 
     const { data, error } = await supabase
       .from('compliance_items')
       .insert([
         {
-          ca_id: body.caId,
-          client_id: body.clientId,
-          title: body.title,
-          description: body.description,
+          ca_id: auth.isCAOrStaff ? (auth.isAdmin && body.caId ? body.caId : auth.userId) : (body.caId || null),
+          client_id: targetClientId || auth.userId,
+          title,
+          description: body.description || '',
           compliance_type: body.type || 'GST',
-          due_date: body.dueDate,
+          due_date: dueDate,
           status: 'not-started',
           priority: dbPriority as any,
           metadata: {
@@ -84,21 +143,12 @@ export async function POST(request: NextRequest) {
           },
         },
       ])
-      .select();
+      .select()
+      .single();
 
     if (error || !data) throw error || new Error('No data returned');
 
-    const item = data[0];
-    const record = {
-      ...item,
-      type: item.compliance_type,
-      priority: item.priority?.toLowerCase(),
-      checklist: item.metadata?.checklist || [],
-      documents: item.metadata?.documents || [],
-      frequency: item.metadata?.frequency || 'once',
-    };
-
-    return NextResponse.json({ success: true, data: record });
+    return NextResponse.json({ success: true, data: formatComplianceItem(data) }, { status: 201 });
   } catch (error) {
     console.error('Compliance POST error:', error);
     return NextResponse.json(
@@ -111,28 +161,57 @@ export async function POST(request: NextRequest) {
 // PUT /api/compliance - Update compliance item
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = getServiceClient();
+    const auth = await getSessionUser(request);
+    if (!auth) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id } = body;
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Compliance item ID is required' }, { status: 400 });
+    }
 
-    const priorityMap: Record<string, string> = {
-      'low': 'LOW',
-      'medium': 'MEDIUM',
-      'high': 'HIGH',
-      'urgent': 'URGENT',
-    };
+    const supabase = getServiceClient();
+    const { data: existing, error: fetchError } = await supabase
+      .from('compliance_items')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError || !existing) {
+      return NextResponse.json({ success: false, error: 'Compliance item not found' }, { status: 404 });
+    }
+
+    const isOwner =
+      auth.isAdmin ||
+      existing.ca_id === auth.userId ||
+      existing.assigned_to === auth.userId ||
+      (existing.client_id && (await canAccessClientRecord(auth, existing.client_id)));
+
+    if (!isOwner) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+
     const updatePayload: any = {
       updated_at: new Date().toISOString(),
     };
 
     if (body.status !== undefined) updatePayload.status = body.status;
-    if (body.priority !== undefined) updatePayload.priority = priorityMap[body.priority?.toLowerCase()] || 'MEDIUM';
+    if (body.priority !== undefined) {
+      updatePayload.priority = PRIORITY_MAP[String(body.priority).toLowerCase()] || 'MEDIUM';
+    }
     if (body.notes !== undefined) updatePayload.notes = body.notes;
+    if (body.title !== undefined) updatePayload.title = body.title;
+    if (body.dueDate !== undefined) updatePayload.due_date = body.dueDate;
 
-    if (body.documents !== undefined || body.checklist !== undefined) {
+    const existingMeta = (existing.metadata && typeof existing.metadata === 'object') ? existing.metadata : {};
+    if (body.documents !== undefined || body.checklist !== undefined || body.frequency !== undefined) {
       updatePayload.metadata = {
-        checklist: body.checklist || [],
-        documents: body.documents || [],
+        ...existingMeta,
+        ...(body.frequency !== undefined ? { frequency: body.frequency } : {}),
+        ...(body.checklist !== undefined ? { checklist: body.checklist } : {}),
+        ...(body.documents !== undefined ? { documents: body.documents } : {}),
       };
     }
 
@@ -140,20 +219,12 @@ export async function PUT(request: NextRequest) {
       .from('compliance_items')
       .update(updatePayload)
       .eq('id', id)
-      .select();
+      .select()
+      .single();
 
     if (error || !data) throw error || new Error('Failed to update');
 
-    const item = data[0];
-    const record = {
-      ...item,
-      type: item.compliance_type,
-      priority: item.priority?.toLowerCase(),
-      checklist: item.metadata?.checklist || [],
-      documents: item.metadata?.documents || [],
-    };
-
-    return NextResponse.json({ success: true, data: record });
+    return NextResponse.json({ success: true, data: formatComplianceItem(data) });
   } catch (error) {
     console.error('Compliance PUT error:', error);
     return NextResponse.json(
@@ -166,15 +237,38 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/compliance
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = getServiceClient();
+    const auth = await getSessionUser(request);
+    if (!auth) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { id } = body;
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'Compliance item ID is required' }, { status: 400 });
+    }
 
-    const { error } = await supabase
+    const supabase = getServiceClient();
+    const { data: existing } = await supabase
       .from('compliance_items')
-      .delete()
-      .eq('id', id);
+      .select('ca_id, client_id')
+      .eq('id', id)
+      .maybeSingle();
 
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Compliance item not found' }, { status: 404 });
+    }
+
+    const canDelete =
+      auth.isAdmin ||
+      existing.ca_id === auth.userId ||
+      (auth.isCAOrStaff && existing.client_id && (await canAccessClientRecord(auth, existing.client_id)));
+
+    if (!canDelete) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { error } = await supabase.from('compliance_items').delete().eq('id', id);
     if (error) throw error;
 
     return NextResponse.json({ success: true });

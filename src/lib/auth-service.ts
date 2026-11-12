@@ -1,20 +1,33 @@
 import { createClient } from '@/utils/supabase/server';
+import { getServiceClient } from '@/lib/backend/supabase';
 import { hash, compare } from 'bcryptjs';
+import { createHash, randomInt } from 'crypto';
 import * as jwt from 'jose';
 import { nanoid } from 'nanoid';
 import { Resend } from 'resend';
 import * as otpauth from 'otpauth';
 import QRCode from 'qrcode';
 
-// Safe lazy Resend client getter to prevent build errors when RESEND_API_KEY is not set
+// Lazy Resend client getter
 function getResendClient() {
-  const apiKey = process.env.RESEND_API_KEY || 're_mock_key_for_build';
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || apiKey.includes('mock') || apiKey.includes('placeholder')) {
+    return null;
+  }
   return new Resend(apiKey);
 }
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-);
+const getJwtSecretBytes = () => {
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_SECRET (or NEXTAUTH_SECRET) must be configured with at least 32 characters');
+  }
+  return new TextEncoder().encode(secret);
+};
+
+function hashTokenValue(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex');
+}
 
 /**
  * Hash a password
@@ -40,7 +53,7 @@ export async function generateJWT(
   return new jwt.SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime(expiresIn)
-    .sign(JWT_SECRET);
+    .sign(getJwtSecretBytes());
 }
 
 /**
@@ -48,7 +61,7 @@ export async function generateJWT(
  */
 export async function verifyJWT(token: string): Promise<Record<string, any> | null> {
   try {
-    const verified = await jwt.jwtVerify(token, JWT_SECRET);
+    const verified = await jwt.jwtVerify(token, getJwtSecretBytes());
     return verified.payload as Record<string, any>;
   } catch {
     return null;
@@ -59,7 +72,7 @@ export async function verifyJWT(token: string): Promise<Record<string, any> | nu
  * Generate OTP
  */
 export function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
 /**
@@ -77,6 +90,10 @@ export async function sendVerificationEmail(
     }
 
     const resend = getResendClient();
+    if (!resend) {
+      console.log(`[Simulated Email] Verification link for ${email}: ${verificationLink}`);
+      return true;
+    }
     const response = await resend.emails.send({
       from: 'Taxmate <noreply@taxmate.in>',
       to: email,
@@ -115,6 +132,10 @@ export async function sendPasswordResetEmail(
     }
 
     const resend = getResendClient();
+    if (!resend) {
+      console.log(`[Simulated Email] Password reset link for ${email}: ${resetLink}`);
+      return true;
+    }
     const response = await resend.emails.send({
       from: 'Taxmate <noreply@taxmate.in>',
       to: email,
@@ -154,6 +175,10 @@ export async function sendOTPEmail(
     }
 
     const resend = getResendClient();
+    if (!resend) {
+      console.log(`[Simulated OTP Email] OTP for ${email}: ${otp}`);
+      return true;
+    }
     const response = await resend.emails.send({
       from: 'Taxmate <noreply@taxmate.in>',
       to: email,
@@ -224,7 +249,7 @@ export function verify2FAToken(secret: string, token: string): boolean {
  * Create or update user session
  */
 export async function createUserSession(userId: string, ipAddress?: string) {
-  const supabase = await createClient();
+  const supabase = getServiceClient();
   const sessionToken = nanoid(32);
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -232,7 +257,7 @@ export async function createUserSession(userId: string, ipAddress?: string) {
     .from('user_sessions')
     .insert({
       user_id: userId,
-      token_hash: sessionToken,
+      token_hash: hashTokenValue(sessionToken),
       ip_address: ipAddress,
       user_agent: process.env.USER_AGENT || 'unknown',
       expires_at: expiresAt.toISOString(),
@@ -251,12 +276,12 @@ export async function createUserSession(userId: string, ipAddress?: string) {
  * Validate user session
  */
 export async function validateUserSession(sessionToken: string) {
-  const supabase = await createClient();
+  const supabase = getServiceClient();
 
   const { data, error } = await supabase
     .from('user_sessions')
     .select('user_id, expires_at, active')
-    .eq('token_hash', sessionToken)
+    .eq('token_hash', hashTokenValue(sessionToken))
     .single();
 
   if (error || !data) {
@@ -278,12 +303,12 @@ export async function validateUserSession(sessionToken: string) {
  * Invalidate user session
  */
 export async function invalidateUserSession(sessionToken: string) {
-  const supabase = await createClient();
+  const supabase = getServiceClient();
 
   const { error } = await supabase
     .from('user_sessions')
     .update({ active: false })
-    .eq('token_hash', sessionToken);
+    .eq('token_hash', hashTokenValue(sessionToken));
 
   if (error) {
     console.error('Failed to invalidate session:', error);
@@ -310,7 +335,7 @@ export async function createAuditLog(
   resourceId?: string,
   ipAddress?: string
 ) {
-  const supabase = await createClient();
+  const supabase = getServiceClient();
 
   const { error } = await supabase
     .from('activity_logs')
@@ -333,12 +358,12 @@ export async function createAuditLog(
 export const authService = {
   async sendOTP(email: string): Promise<{ success: boolean; message: string }> {
     try {
-      const supabase = await createClient();
+      const supabase = getServiceClient();
 
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, name, email')
-        .eq('email', email)
+        .eq('email', email.toLowerCase().trim())
         .single();
 
       if (userError || !userData) {
@@ -348,11 +373,18 @@ export const authService = {
       const otp = generateOTP();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+      await supabase
+        .from('verification_tokens')
+        .update({ used: true, used_at: new Date().toISOString() })
+        .eq('user_id', userData.id)
+        .eq('type', 'OTP')
+        .eq('used', false);
+
       const { error: tokenError } = await supabase
         .from('verification_tokens')
         .insert({
           user_id: userData.id,
-          token: otp,
+          token: hashTokenValue(otp),
           type: 'OTP',
           expires_at: expiresAt.toISOString(),
         });
@@ -361,7 +393,7 @@ export const authService = {
         throw new Error('Failed to generate OTP');
       }
 
-      const emailSent = await sendOTPEmail(email, userData.name, otp);
+      const emailSent = await sendOTPEmail(userData.email, userData.name, otp);
       if (!emailSent) {
         throw new Error('Failed to send OTP email');
       }
@@ -377,12 +409,12 @@ export const authService = {
 
   async verifyOTP(email: string, otp: string): Promise<{ user: any; token: string }> {
     try {
-      const supabase = await createClient();
+      const supabase = getServiceClient();
 
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('email', email)
+        .eq('email', email.toLowerCase().trim())
         .single();
 
       if (userError || !userData) {
@@ -393,7 +425,7 @@ export const authService = {
         .from('verification_tokens')
         .select('*')
         .eq('user_id', userData.id)
-        .eq('token', otp)
+        .eq('token', hashTokenValue(otp))
         .eq('type', 'OTP')
         .single();
 
@@ -418,7 +450,11 @@ export const authService = {
         throw new Error('Failed to verify OTP');
       }
 
-      const token = await generateJWT({ userId: userData.id, email: userData.email });
+      const token = await generateJWT({
+        userId: userData.id,
+        email: userData.email,
+        role: userData.role || 'CLIENT',
+      });
 
       const sessionToken = await createUserSession(userData.id);
       if (!sessionToken) {

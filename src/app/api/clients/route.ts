@@ -1,34 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { clientService } from '@/lib/client-service'
-import { createServerSupabaseClient } from '@lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server';
+import { clientService } from '@/lib/client-service';
+import { getSessionUser } from '@/lib/api/server-auth';
 
-async function getAuthorizedCA() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return { supabase, user: null }
-
-  const role = String(user.app_metadata?.role || '').toUpperCase()
-  if (!['CA', 'STAFF', 'SUPER_ADMIN'].includes(role)) return { supabase, user: null }
-  return { supabase, user }
-}
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const { user } = await getAuthorizedCA()
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const auth = await getSessionUser(request);
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const caId = user.id
+    if (!auth.isCAOrStaff) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-    const searchParams = request.nextUrl.searchParams
-    const search = searchParams.get('search') || undefined
-    const type = searchParams.get('type') || undefined
-    const status = searchParams.get('status') || undefined
-    const skip = parseInt(searchParams.get('skip') || '0')
-    const take = parseInt(searchParams.get('take') || '20')
+    const searchParams = request.nextUrl.searchParams;
+    const search = searchParams.get('search') || undefined;
+    const type = searchParams.get('type') || undefined;
+    const status = searchParams.get('status') || undefined;
+    const skip = Math.max(0, parseInt(searchParams.get('skip') || '0', 10) || 0);
+    const take = Math.min(100, Math.max(1, parseInt(searchParams.get('take') || '20', 10) || 20));
+
+    const requestedCaId = searchParams.get('caId');
+    const caId = auth.isAdmin && requestedCaId ? requestedCaId : auth.userId;
 
     const result = await clientService.getClientsByCA(caId, {
       search: search || undefined,
@@ -36,41 +30,40 @@ export async function GET(request: NextRequest) {
       status,
       skip,
       take,
-    })
+    });
 
-    return NextResponse.json(result)
+    return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Get clients error:', error)
+    console.error('Get clients error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch clients' },
       { status: 400 }
-    )
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { user } = await getAuthorizedCA()
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const auth = await getSessionUser(request);
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const caId = user.id
+    if (!auth.isCAOrStaff) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-    const body = await request.json()
-    const client = await clientService.createClient(caId, body)
+    const body = await request.json();
+    const client = await clientService.createClient(auth.userId, body);
 
     return NextResponse.json(
       { success: true, client },
       { status: 201 }
-    )
+    );
   } catch (error: any) {
-    console.error('Create client error:', error)
+    console.error('Create client error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create client' },
       { status: 400 }
-    )
+    );
   }
 }

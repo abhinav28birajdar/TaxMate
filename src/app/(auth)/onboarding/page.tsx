@@ -1,22 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   CheckCircle2, 
   User, 
   Briefcase, 
-  Building, 
   ShieldCheck, 
   ArrowRight, 
-  UploadCloud, 
-  FileCheck, 
-  Sparkles,
-  Phone,
-  Mail,
-  CreditCard,
-  Camera
+  Camera,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -26,21 +20,73 @@ export default function UnifiedOnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [role, setRole] = useState<"customer" | "ca">("customer");
+  const [saving, setSaving] = useState(false);
   
   // Profile Info
-  const [fullName, setFullName] = useState("Abhinav Birajdar");
-  const [phone, setPhone] = useState("+91 98210 98210");
-  const [pan, setPan] = useState("ABCDE1234F");
-  const [aadhaar, setAadhaar] = useState("•••• •••• 9012");
-  const [acceptedTerms, setAcceptedTerms] = useState(true);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pan, setPan] = useState("");
+  const [aadhaar, setAadhaar] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
-  const handleFinishOnboarding = () => {
-    toast.success("KYC verified & profile configured!");
-    if (role === "ca") {
-      router.push("/ca/dashboard");
-    } else {
-      router.push("/client/dashboard");
+  useEffect(() => {
+    let active = true;
+    async function hydrate() {
+      try {
+        const res = await fetch("/api/v1/profile", { credentials: "include" });
+        if (!res.ok || !active) return;
+        const json = await res.json();
+        const u = json?.data?.user;
+        const p = json?.data?.profile;
+        if (p?.fullName || u?.name) setFullName(p?.fullName || u?.name || "");
+        if (p?.phone) setPhone(p.phone);
+        if (String(u?.role || "").toUpperCase() === "CA") setRole("ca");
+      } catch {
+        // Ignore non-blocking hydration failure
+      }
+    }
+    hydrate();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleFinishOnboarding = async () => {
+    setSaving(true);
+    try {
+      await fetch("/api/v1/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          fullName: fullName.trim() || undefined,
+          phone: phone.trim() || undefined,
+        }),
+      });
+      await fetch("/api/v1/onboarding", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          step: 4,
+          completed: true,
+          basicInfo: {
+            fullName: fullName.trim(),
+            phone: phone.trim(),
+            pan: pan.trim().toUpperCase(),
+            aadhaar: aadhaar.trim(),
+            role,
+          },
+          preferences: { acceptedTerms },
+        }),
+      });
+      toast.success("Profile configured!");
+      router.push(role === "ca" ? "/ca/dashboard" : "/portal/dashboard");
+    } catch {
+      toast.error("Could not save onboarding status");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -126,17 +172,24 @@ export default function UnifiedOnboardingPage() {
               )}
             </div>
             <div>
-              <Button 
-                onClick={() => {
-                  setAvatarPreview("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop");
-                  toast.success("Profile photo uploaded!");
-                }}
-                variant="outline" 
-                size="sm" 
-                className="text-xs border-white/10 text-gray-300 rounded-xl"
-              >
+              <label className="inline-flex items-center justify-center px-3 py-1.5 text-xs border border-white/10 text-gray-300 rounded-xl cursor-pointer hover:bg-white/5 transition">
                 Upload Photo
-              </Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Please choose an image smaller than 5MB.");
+                      return;
+                    }
+                    setAvatarPreview(URL.createObjectURL(file));
+                    toast.success("Profile photo selected!");
+                  }}
+                />
+              </label>
               <p className="text-[10px] text-gray-500 mt-1">JPEG, PNG up to 5MB</p>
             </div>
           </div>
@@ -271,9 +324,18 @@ export default function UnifiedOnboardingPage() {
           <div className="pt-2">
             <Button 
               onClick={handleFinishOnboarding}
+              disabled={saving}
               className="w-full max-w-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-2.5 rounded-xl shadow-[0_0_20px_rgba(5,150,105,0.4)]"
             >
-              Go to {role === "ca" ? "CA Dashboard" : "Customer Dashboard"} <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              {saving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Saving Profile...
+                </>
+              ) : (
+                <>
+                  Go to {role === "ca" ? "CA Dashboard" : "Customer Dashboard"} <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </>
+              )}
             </Button>
           </div>
         </motion.div>

@@ -105,10 +105,10 @@ export default function CAOnboardingPage() {
                 setFormData(prev => ({ ...prev, profilePhotoUrl: result?.url || '' }));
             } else if (type === 'certificate') {
                 result = await uploadVerificationDocument(file, user.id, 'certificate');
-                setFormData(prev => ({ ...prev, certificateUrl: result?.url || '' }));
+                setFormData(prev => ({ ...prev, certificateUrl: result?.path || result?.url || '' }));
             } else if (type === 'pan') {
                 result = await uploadVerificationDocument(file, user.id, 'id_proof'); // Mapping PAN to id_proof logically
-                setFormData(prev => ({ ...prev, panCardUrl: result?.url || '' }));
+                setFormData(prev => ({ ...prev, panCardUrl: result?.path || result?.url || '' }));
             }
 
             toast({ title: "Upload Successful", description: `${type} uploaded successfully.` });

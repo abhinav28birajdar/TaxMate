@@ -17,7 +17,7 @@ export const registerSchema = z.object({
   password: passwordSchema,
   name: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().optional(),
-  role: z.enum(['CA', 'CLIENT', 'STAFF']),
+  role: z.enum(['CA', 'CLIENT']),
   icaiNumber: z.string().optional(),
   companyName: z.string().optional(),
 });

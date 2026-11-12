@@ -4,7 +4,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('Invalid Supabase URL').optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key required').optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'Supabase service role key required').optional(),
-  JWT_SECRET: z.string().min(32, 'JWT secret must be at least 32 characters').optional(),
+  JWT_SECRET: z.string().min(32, 'JWT secret must be at least 32 characters').optional().or(z.literal('')),
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
   NEXT_PUBLIC_APP_URL: z.string().url('Invalid app URL').optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

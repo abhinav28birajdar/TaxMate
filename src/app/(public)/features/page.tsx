@@ -121,9 +121,9 @@ export default function FeaturesPage() {
             <h3 className="text-xl font-bold text-white">Experience all 20 modules in action</h3>
             <p className="text-xs text-gray-400">Test drive the complete client portal, CA workspace, and filing pipelines.</p>
           </div>
-          <Link href="/modules">
+          <Link href="/register">
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(5,150,105,0.4)]">
-              Open 20 Modules Showcase <ArrowRight className="w-4 h-4 ml-1.5" />
+              Start Your Free Trial <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </Link>
         </div>

@@ -304,7 +304,6 @@ export const ComplianceService = {
    */
   generateComplianceChecklist: async (clientId: string, caId: string) => {
     const supabase = await createServerClient();
-    const items: any[] = [];
     const now = new Date();
 
     // GSTR-1 Monthly
@@ -608,10 +607,11 @@ export const AnalyticsService = {
       .eq('ca_id', caId)
       .eq('status', 'SUCCESS');
 
-    // Get expenses out
+    // Get expenses out (scoped strictly to CA)
     const { data: expenses } = await supabase
       .from('expenses')
-      .select('amount');
+      .select('amount')
+      .eq('user_id', caId);
 
     const inflow = ((payments as any[]) || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
     const outflow = ((expenses as any[]) || []).reduce((sum: number, e: any) => sum + (e.amount || 0), 0);

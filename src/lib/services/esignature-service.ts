@@ -160,6 +160,7 @@ export class ESignatureService {
         signed_at: new Date().toISOString(),
       })
       .eq('id', signatureRequestId)
+      .eq('signer_id', signerId)
       .select()
       .single();
 
@@ -236,17 +237,24 @@ export class ESignatureService {
   async downloadSignedDocument(documentId: string): Promise<string> {
     const { data: document } = await this.getSupabase()
       .from('documents')
-      .select('file_path')
+      .select('file_path, file_url')
       .eq('id', documentId)
       .single();
 
     if (!document) throw new Error('Document not found');
 
-    const { data } = this.getSupabase().storage
-      .from('case-documents')
-      .getPublicUrl(document.file_path);
+    const objectPath = document.file_path || document.file_url;
+    if (!objectPath) throw new Error('Document path not found');
 
-    return data.publicUrl;
+    const { data, error } = await this.getSupabase().storage
+      .from('documents')
+      .createSignedUrl(objectPath, 3600);
+
+    if (error || !data?.signedUrl) {
+      throw new Error(error?.message || 'Failed to generate download URL');
+    }
+
+    return data.signedUrl;
   }
 
   /**

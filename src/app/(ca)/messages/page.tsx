@@ -52,211 +52,176 @@ export default function OperatorMessagesPage() {
         scrollToBottom();
     }, [messages]);
 
-    // 1. Fetch conversations
+    // 1. Fetch real conversations via backend API
     useEffect(() => {
         if (!user) return;
 
         const loadConversations = async () => {
             try {
-                // Get organization of current operator
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('organization_id')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                const orgId = profile?.organization_id;
-                if (!orgId) {
-                    setConversations(getMockConversations());
-                    setLoadingConvs(false);
-                    return;
+                const res = await fetch('/api/conversations');
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(json.error || 'Failed to load conversations');
                 }
-
-                // Query conversations
-                const { data: convs, error } = await supabase
-                    .from('conversations')
-                    .select('*')
-                    .eq('organization_id', orgId)
-                    .order('last_message_at', { ascending: false });
-
-                if (error) throw error;
-
-                if (convs && convs.length > 0) {
-                    setConversations(convs);
-                } else {
-                    setConversations(getMockConversations());
+                const loaded = (json.conversations || []).map((c: any) => ({
+                    ...c,
+                    title: c.displayTitle || c.title || 'Client Channel',
+                    last_message_preview: c.lastMessageText || '',
+                }));
+                setConversations(loaded);
+                if (loaded.length > 0 && !selectedConv) {
+                    setSelectedConv(loaded[0]);
                 }
             } catch (err: any) {
                 console.error('Error fetching conversations:', err);
-                setConversations(getMockConversations());
+                toast.error(err.message || 'Unable to load practice channels');
+                setConversations([]);
             } finally {
                 setLoadingConvs(false);
             }
         };
 
         loadConversations();
-    }, [user, supabase]);
+    }, [user]);
 
-    // 2. Fetch messages on conversation selection
+    // 2. Fetch messages & shared files on conversation selection
     useEffect(() => {
         if (!selectedConv) return;
 
+        let active = true;
+
         const loadMessages = async () => {
             try {
-                if (String(selectedConv.id).startsWith('mock-')) {
-                    setMessages(getMockMessages(selectedConv.id));
-                    setClientMeta(getMockClientMeta(selectedConv.id));
-                    setSharedFiles(getMockSharedFiles(selectedConv.id));
-                    return;
+                const res = await fetch(`/api/messages?conversationId=${encodeURIComponent(selectedConv.id)}&limit=100`);
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(json.error || json.message || 'Failed to load messages');
+                }
+                const dataPayload = json.data || json;
+                if (active) {
+                    setMessages(dataPayload.messages || []);
                 }
 
-                // Fetch messages from DB
-                const { data: msgs, error } = await supabase
-                    .from('messages')
-                    .select('*')
-                    .eq('conversation_id', selectedConv.id)
-                    .order('created_at', { ascending: true });
-
-                if (error) throw error;
-                setMessages(msgs || []);
-
-                // Fetch related client metadata
+                // Fetch related client metadata & shared docs if client_id exists
                 if (selectedConv.client_id) {
-                    const { data: client } = await supabase
-                        .from('clients')
-                        .select('id, full_name, email, phone, pan, status')
-                        .eq('id', selectedConv.client_id)
-                        .maybeSingle();
-                    
-                    if (client) {
+                    const [{ data: client }, docsRes] = await Promise.all([
+                        supabase
+                            .from('clients')
+                            .select('id, full_name, email, phone, pan, status')
+                            .eq('id', selectedConv.client_id)
+                            .maybeSingle(),
+                        fetch(`/api/documents?clientId=${encodeURIComponent(selectedConv.client_id)}&take=10`),
+                    ]);
+
+                    if (client && active) {
                         const { count } = await supabase
                             .from('tasks')
                             .select('*', { count: 'exact', head: true })
                             .eq('client_id', client.id)
-                            .neq('status', 'completed');
-                        
+                            .neq('status', 'COMPLETED');
+
                         setClientMeta({
                             ...client,
                             openTasks: count || 0
                         });
+                    } else if (active) {
+                        setClientMeta(null);
                     }
+
+                    if (docsRes.ok && active) {
+                        const docsJson = await docsRes.json().catch(() => ({}));
+                        setSharedFiles((docsJson.documents || []).map((d: any) => ({
+                            id: d.id,
+                            name: d.file_name || d.name || 'Document',
+                            size: d.file_size ? `${(Number(d.file_size) / 1024 / 1024).toFixed(2)} MB` : 'N/A',
+                        })));
+                    }
+                } else if (active) {
+                    setClientMeta(null);
+                    setSharedFiles([]);
                 }
-
-                // Subscribe to Realtime insertions
-                const channel = supabase.channel(`room-operator-${selectedConv.id}`)
-                    .on('postgres_changes', {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'messages',
-                        filter: `conversation_id=eq.${selectedConv.id}`
-                    }, (payload) => {
-                        setMessages(prev => {
-                            if (prev.some(m => m.id === payload.new.id)) return prev;
-                            return [...prev, payload.new];
-                        });
-                    })
-                    .subscribe();
-
-                return () => {
-                    supabase.removeChannel(channel);
-                };
-
             } catch (err: any) {
                 console.error('Error loading chat messages:', err);
-                setMessages(getMockMessages(selectedConv.id));
+                toast.error(err.message || 'Failed to load messages');
             }
         };
 
         loadMessages();
-    }, [selectedConv, supabase]);
+
+        // Subscribe to Realtime insertions
+        const channel = supabase.channel(`room-operator-${selectedConv.id}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `conversation_id=eq.${selectedConv.id}`
+            }, (payload) => {
+                setMessages(prev => {
+                    if (prev.some(m => m.id === payload.new.id)) return prev;
+                    return [...prev, payload.new];
+                });
+            })
+            .subscribe();
+
+        return () => {
+            active = false;
+            supabase.removeChannel(channel);
+        };
+    }, [selectedConv?.id, supabase]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedConv) return;
+        if (!newMessage.trim() || !selectedConv || !user) return;
 
         setSending(true);
-        const text = newMessage;
+        const text = newMessage.trim();
         setNewMessage('');
 
         try {
-            const timestamp = new Date().toISOString();
-            const tempId = `temp-${Date.now()}`;
-            const localMsg = {
-                id: tempId,
-                sender_id: user?.id || 'mock-ca-id',
-                content: text,
-                created_at: timestamp
-            };
+            const res = await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    conversationId: selectedConv.id,
+                    content: text,
+                    messageType: 'TEXT',
+                }),
+            });
 
-            setMessages(prev => [...prev, localMsg]);
-
-            if (!String(selectedConv.id).startsWith('mock-')) {
-                await supabase
-                    .from('messages')
-                    .insert({
-                        conversation_id: selectedConv.id,
-                        sender_id: user?.id,
-                        content: text,
-                        message_type: 'text'
-                    });
-            } else {
-                // Simulated reply for sandbox
-                setTimeout(() => {
-                    const mockReply = {
-                        id: `mock-reply-${Date.now()}`,
-                        sender_id: 'mock-client-id',
-                        content: `Got it! I am uploading the documents matching: "${text}" now.`,
-                        created_at: new Date().toISOString()
-                    };
-                    setMessages(prev => [...prev, mockReply]);
-                }, 1500);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.message || json.error || 'Could not send message');
             }
 
+            const savedMsg = json.data?.message || json.data || json;
+            setMessages(prev => {
+                if (prev.some(m => m.id === savedMsg.id)) return prev;
+                return [...prev, {
+                    id: savedMsg.id,
+                    sender_id: savedMsg.sender_id || savedMsg.senderId || user.id,
+                    content: savedMsg.content,
+                    message_type: savedMsg.message_type || 'TEXT',
+                    created_at: savedMsg.created_at || savedMsg.createdAt || new Date().toISOString(),
+                }];
+            });
             toast.success('Message dispatched.');
-        } catch (err) {
-            toast.error('Could not transmit message.');
+        } catch (err: any) {
+            setNewMessage(text);
+            toast.error(err.message || 'Could not transmit message.');
         } finally {
             setSending(false);
         }
     };
 
-    const getMockConversations = () => [
-        { id: 'mock-1', title: 'ABC Business Solutions', type: 'client', last_message_at: new Date().toISOString(), last_message_preview: 'I uploaded my sales reports.' },
-        { id: 'mock-2', title: 'Aditya Birla Services', type: 'client', last_message_at: new Date(Date.now() - 3600000).toISOString(), last_message_preview: 'Payment invoice cleared.' },
-        { id: 'mock-3', title: 'TaxMate Operators Chat', type: 'team', last_message_at: new Date(Date.now() - 7200000).toISOString(), last_message_preview: 'Priya: I will review Dr. Shah ITR.' }
-    ];
-
-    const getMockMessages = (id: string) => {
-        if (id === 'mock-1') {
-            return [
-                { id: 'm-1', sender_id: 'mock-client-id', content: 'Hi, I just uploaded the business invoice statement sheets.', created_at: new Date(Date.now() - 3600000 * 2).toISOString() },
-                { id: 'm-2', sender_id: 'mock-ca-id', content: 'Acknowledge. Let me confirm the GST filings columns.', created_at: new Date(Date.now() - 3600000).toISOString() }
-            ];
-        }
-        return [
-            { id: 'm-3', sender_id: 'mock-client-id', content: 'Hello! I require ITR-4 filings confirmation.', created_at: new Date(Date.now() - 3600000).toISOString() }
-        ];
-    };
-
-    const getMockClientMeta = (id: string) => ({
-        full_name: id === 'mock-1' ? 'ABC Business Solutions' : 'Aditya Birla Services',
-        email: id === 'mock-1' ? 'info@abcsolutions.com' : 'billing@birla.com',
-        phone: '+91 99887 76655',
-        pan: 'ABCDE1234F',
-        status: 'active',
-        openTasks: 3
-    });
-
-    const getMockSharedFiles = (id: string) => [
-        { id: 'f-1', name: 'GST_Sales_Sheet_Q1.xlsx', size: '2.4 MB' },
-        { id: 'f-2', name: 'PAN_Card_Verify.pdf', size: '1.2 MB' }
-    ];
-
     const filteredConvs = conversations.filter(c => {
-        const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        const title = (c.title || '').toLowerCase();
+        const matchesSearch = title.includes(searchQuery.toLowerCase()) ||
             (c.last_message_preview && c.last_message_preview.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        const matchesType = convFilter === 'all' || c.type === convFilter;
+        const matchesType =
+            convFilter === 'all' ||
+            (convFilter === 'client' && (c.type === 'client' || c.type === 'direct')) ||
+            (convFilter === 'team' && (c.type === 'team' || c.type === 'group'));
 
         return matchesSearch && matchesType;
     });
@@ -336,7 +301,7 @@ export default function OperatorMessagesPage() {
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-black/40">
                             {messages.map((msg) => {
-                                const isSelf = msg.sender_id === user?.id || msg.sender_id === 'mock-ca-id';
+                                const isSelf = msg.sender_id === user?.id;
                                 return (
                                     <div key={msg.id} className={`flex ${isSelf ? 'justify-end' : 'justify-start'} w-full animate-in fade-in`}>
                                         <div className={`max-w-md p-3 border rounded-none ${

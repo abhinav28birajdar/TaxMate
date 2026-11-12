@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createHash } from 'crypto';
+import { getServiceClient } from '@/lib/backend/supabase';
 import { requestPasswordResetSchema } from '@/lib/validators/auth';
 import { generateVerificationToken, sendPasswordResetEmail, createAuditLog } from '@/lib/auth-service';
 
@@ -17,17 +18,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email } = validation.data;
-    const supabase = await createClient();
+    const normalizedEmail = validation.data.email.toLowerCase().trim();
+    const supabase = getServiceClient();
 
-    // Get user
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('id, name, email')
-      .eq('email', email)
-      .single();
+      .eq('email', normalizedEmail)
+      .maybeSingle();
 
-    // Don't reveal if email exists or not (security)
+    // Never reveal whether the email exists
     if (userError || !user) {
       return NextResponse.json(
         {
@@ -38,16 +38,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate reset token
     const resetToken = generateVerificationToken();
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const tokenHash = createHash('sha256').update(resetToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    // Store reset token
+    await supabase
+      .from('verification_tokens')
+      .update({ used: true, used_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .eq('type', 'PASSWORD_RESET')
+      .eq('used', false);
+
     const { error: tokenError } = await supabase
       .from('verification_tokens')
       .insert({
-        identifier: user.id,
-        token: resetToken,
+        user_id: user.id,
+        token: tokenHash,
         type: 'PASSWORD_RESET',
         expires_at: expiresAt.toISOString(),
       });
@@ -59,9 +65,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send reset email
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${resetToken}`;
-    const emailSent = await sendPasswordResetEmail(user.email, user.name, resetLink);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const resetLink = `${appUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+    const emailSent = await sendPasswordResetEmail(user.email, user.name || 'User', resetLink);
 
     if (emailSent) {
       await createAuditLog(user.id, 'PASSWORD_RESET_REQUESTED', 'USER', user.id);

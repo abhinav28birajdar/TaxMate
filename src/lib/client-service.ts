@@ -1,4 +1,5 @@
-import { createClient } from '@/utils/supabase/server';
+import { randomBytes } from 'crypto';
+import { getServiceClient } from '@/lib/backend/supabase';
 
 export const clientService = {
   // Create client
@@ -28,33 +29,49 @@ export const clientService = {
     tags?: string[];
     portalAccess?: boolean;
   }) {
-    const supabase = await createClient();
+    const adminClient = getServiceClient();
+    const supabase = getServiceClient();
 
-    // 1. Get CA's organization_id
-    const { data: caProfile, error: caProfileError } = await supabase
+    // 1. Get CA's organization_id (or auto-provision firm org if absent)
+    const { data: caProfile } = await supabase
       .from('profiles')
-      .select('organization_id')
+      .select('organization_id, full_name, email')
       .eq('id', caId)
-      .single();
+      .maybeSingle();
 
-    if (caProfileError || !caProfile?.organization_id) {
-      throw new Error(`CA organization not found: ${caProfileError?.message || 'Empty ID'}`);
+    let orgId = caProfile?.organization_id || null;
+    if (!orgId) {
+      const { data: createdOrg, error: orgError } = await adminClient
+        .from('organizations')
+        .insert({
+          name: `${caProfile?.full_name || 'TaxMate CA'} Practice`,
+          email: caProfile?.email || undefined,
+        })
+        .select('id')
+        .single();
+      if (orgError || !createdOrg?.id) {
+        throw new Error(`CA organization not found and auto-creation failed: ${orgError?.message || 'Empty ID'}`);
+      }
+      orgId = createdOrg.id;
+      await adminClient.from('profiles').update({ organization_id: orgId }).eq('id', caId);
     }
-
-    const orgId = caProfile.organization_id;
 
     // 2. Create profile in auth if portal access requested
     let portalUserId = null;
     if (data.portalAccess && data.email) {
-      const { data: userAuth, error: authError } = await supabase.auth.admin.createUser({
+      const tempPassword = `${randomBytes(12).toString('hex')}Aa1!`;
+      const { data: userAuth, error: authError } = await adminClient.auth.admin.createUser({
         email: data.email,
-        password: 'password123', // temporary default password
-        email_confirm: true,
+        password: tempPassword,
+        email_confirm: false,
+        app_metadata: {
+          role: 'CLIENT',
+        },
         user_metadata: {
-          role: 'client',
+          role: 'CLIENT',
           name: data.fullName,
-          organization_id: orgId
-        }
+          organization_id: orgId,
+        },
       });
       if (!authError && userAuth?.user) {
         portalUserId = userAuth.user.id;
@@ -110,7 +127,7 @@ export const clientService = {
     skip?: number;
     take?: number;
   }) {
-    const supabase = await createClient();
+    const supabase = getServiceClient();
 
     let query = supabase
       .from('clients')
@@ -145,7 +162,7 @@ export const clientService = {
 
   // Get client by ID
   async getClientById(clientId: string) {
-    const supabase = await createClient();
+    const supabase = getServiceClient();
 
     const { data: client, error } = await supabase
       .from('clients')
@@ -178,7 +195,7 @@ export const clientService = {
 
   // Update client
   async updateClient(clientId: string, data: Partial<any>) {
-    const supabase = await createClient();
+    const supabase = getServiceClient();
 
     const { data: updatedClient, error } = await supabase
       .from('clients')
@@ -217,7 +234,7 @@ export const clientService = {
 
   // Delete client
   async deleteClient(clientId: string) {
-    const supabase = await createClient();
+    const supabase = getServiceClient();
     const { data: client } = await supabase.from('clients').select('portal_user_id').eq('id', clientId).single();
     
     // 1. Delete client record (cascades)
@@ -226,7 +243,8 @@ export const clientService = {
 
     // 2. Delete auth portal user if linked
     if (client?.portal_user_id) {
-      await supabase.auth.admin.deleteUser(client.portal_user_id);
+      const adminClient = getServiceClient();
+      await adminClient.auth.admin.deleteUser(client.portal_user_id);
     }
 
     return { success: true };
@@ -234,7 +252,7 @@ export const clientService = {
 
   // Get client timeline/activity
   async getClientTimeline(clientId: string, limit: number = 50) {
-    const supabase = await createClient();
+    const supabase = getServiceClient();
 
     const [tasks, documents, invoices, appointments, notes] = await Promise.all([
       supabase.from('tasks').select('*').eq('client_id', clientId).order('updated_at', { ascending: false }).limit(limit),
@@ -255,7 +273,7 @@ export const clientService = {
 
   // Add tag to client
   async addTagToClient(clientId: string, tagName: string) {
-    const supabase = await createClient();
+    const supabase = getServiceClient();
     const { data: client } = await supabase.from('clients').select('tags').eq('id', clientId).single();
     if (!client) throw new Error('Client not found');
 
@@ -268,7 +286,7 @@ export const clientService = {
 
   // Get clients by tag
   async getClientsByTag(caId: string, tagName: string) {
-    const supabase = await createClient();
+    const supabase = getServiceClient();
     const { data, error } = await supabase
       .from('clients')
       .select('*')

@@ -6,11 +6,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { errorResponse, ApiError, ERROR_CODES, HTTP_STATUS } from './response';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXTAUTH_SECRET || 'fallback-secret-change-in-production'
-);
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET;
+  return secret ? new TextEncoder().encode(secret) : null;
+};
 
-interface DecodedToken {
+export interface DecodedToken {
   sub: string;
   email: string;
   role: string;
@@ -19,29 +20,54 @@ interface DecodedToken {
 }
 
 /**
- * Extract and verify JWT token from request
+ * Extract and verify authentication from request (Supabase session, Supabase Bearer token, or JWT)
  */
 export async function verifyAuth(request: NextRequest): Promise<DecodedToken> {
   const authHeader = request.headers.get('authorization');
 
-  if (!authHeader?.startsWith('Bearer ')) {
-    throw new ApiError('Missing or invalid authorization header', {
-      code: ERROR_CODES.UNAUTHORIZED,
-      statusCode: HTTP_STATUS.UNAUTHORIZED,
-    });
-  }
-
-  const token = authHeader.slice(7); // Remove 'Bearer ' prefix
-
+  // 1. Check Supabase Session via Server Auth (resolves authoritative role from DB + rejects banned users)
   try {
-    const verified = await jwtVerify(token, JWT_SECRET);
-    return verified.payload as unknown as DecodedToken;
-  } catch (error) {
-    throw new ApiError('Invalid or expired token', {
-      code: ERROR_CODES.UNAUTHORIZED,
-      statusCode: HTTP_STATUS.UNAUTHORIZED,
-    });
+    const { getSessionUser } = await import('./server-auth');
+    const sessionUser = await getSessionUser(request);
+    if (sessionUser) {
+      return {
+        sub: sessionUser.userId,
+        email: sessionUser.email,
+        role: sessionUser.role,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      };
+    }
+  } catch {
+    // Proceed to check custom JWT token
   }
+
+  // 2. Check Custom JWT Token if Authorization header is provided
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    const secret = getJwtSecret();
+    if (secret) {
+      try {
+        const verified = await jwtVerify(token, secret);
+        const payload = verified.payload as any;
+        const { normalizeCanonicalRole } = await import('./server-auth');
+        return {
+          sub: payload.sub || payload.userId || payload.id || '',
+          email: payload.email || '',
+          role: normalizeCanonicalRole(payload.role),
+          iat: payload.iat || Math.floor(Date.now() / 1000),
+          exp: payload.exp || Math.floor(Date.now() / 1000) + 3600,
+        };
+      } catch {
+        // Fall through
+      }
+    }
+  }
+
+  throw new ApiError('Missing or invalid authentication credentials', {
+    code: ERROR_CODES.UNAUTHORIZED,
+    statusCode: HTTP_STATUS.UNAUTHORIZED,
+  });
 }
 
 /**
@@ -174,6 +200,10 @@ export function cleanupRateLimits() {
 }
 
 // Run cleanup every 5 minutes
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   cleanupRateLimits();
 }, 5 * 60 * 1000);
+if (cleanupInterval && typeof cleanupInterval.unref === 'function') {
+  cleanupInterval.unref();
+}
+

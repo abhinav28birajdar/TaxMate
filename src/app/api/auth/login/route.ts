@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { getServiceClient } from '@/lib/backend/supabase';
 import { loginSchema } from '@/lib/validators/auth';
 import { verifyPassword, createUserSession, createAuditLog } from '@/lib/auth-service';
 
@@ -9,7 +10,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate input
     const validation = loginSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -22,17 +22,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password, rememberMe } = validation.data;
+    const email = validation.data.email.toLowerCase().trim();
+    const { password, rememberMe } = validation.data;
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
 
     const supabase = await createClient();
+    const serviceClient = getServiceClient();
 
-    // Get user from database
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await serviceClient
       .from('users')
       .select('*')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     if (userError || !user) {
       return NextResponse.json(
@@ -41,7 +42,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user is active
     if (user.status !== 'ACTIVE') {
       return NextResponse.json(
         {
@@ -52,19 +52,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify password
-    const isPasswordValid = await verifyPassword(password, user.password_hash);
-    if (!isPasswordValid) {
-      // Log failed attempt
-      await createAuditLog(user.id, 'LOGIN_FAILED', 'USER', user.id, ipAddress);
-
-      return NextResponse.json(
-        { success: false, error: 'Invalid email or password' },
-        { status: 401 }
-      );
+    if (user.password_hash) {
+      const isPasswordValid = await verifyPassword(password, user.password_hash);
+      if (!isPasswordValid) {
+        await createAuditLog(user.id, 'LOGIN_FAILED', 'USER', user.id, ipAddress);
+        return NextResponse.json(
+          { success: false, error: 'Invalid email or password' },
+          { status: 401 }
+        );
+      }
     }
 
-    // Sign in with Supabase
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -72,20 +70,18 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       return NextResponse.json(
-        { success: false, error: 'Authentication failed' },
+        { success: false, error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // Create session
     const sessionToken = await createUserSession(user.id, ipAddress);
 
-    // Update last login
-    await supabase
+    await serviceClient
       .from('users')
       .update({
         last_login_at: new Date().toISOString(),
-        login_count: user.login_count + 1,
+        login_count: (user.login_count ?? 0) + 1,
       })
       .eq('id', user.id);
 

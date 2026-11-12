@@ -1,39 +1,41 @@
 "use client";
 
-import React, { useState } from "react";
-import { 
-  CheckSquare, 
-  Clock, 
-  AlertCircle, 
-  Plus, 
-  MessageSquare, 
-  Paperclip, 
-  User, 
-  Calendar, 
-  Filter, 
-  ChevronRight, 
-  X, 
-  Sparkles,
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CheckSquare,
+  Clock,
+  Plus,
+  MessageSquare,
+  Paperclip,
+  X,
   CheckCircle2,
   FileText,
-  Layers,
-  ArrowRight,
   List,
   Kanban,
   Download,
   Upload,
-  History,
   Send,
   Trash2,
-  Check
+  Check,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/UnifiedAuthContext";
+import { useRealtimeTasks } from "@/hooks/use-realtime";
 
-export type TaskStatus = "pending" | "in_progress" | "review" | "customer_approval" | "filed" | "completed";
+export type TaskStatus =
+  | "pending"
+  | "in_progress"
+  | "review"
+  | "customer_approval"
+  | "filed"
+  | "completed";
 
 export interface TaskAttachment {
   id: string;
+  docId?: string;
   name: string;
   size: string;
   uploadedAt: string;
@@ -57,144 +59,169 @@ export interface TaskItem {
   id: string;
   title: string;
   client: string;
+  clientId?: string | null;
   isMyTask?: boolean;
   priority: "Urgent" | "High" | "Medium" | "Low";
   status: TaskStatus;
   due: string;
+  dueRaw?: string | null;
   isOverdue?: boolean;
   assignedTo: string;
   description: string;
   attachments: TaskAttachment[];
   comments: TaskComment[];
   history: TaskHistoryEntry[];
+  rawMetadata?: Record<string, any>;
+}
+
+function mapRowToStage(row: any): TaskStatus {
+  const stage = row.metadata?.workflowStage;
+  if (
+    stage &&
+    ["pending", "in_progress", "review", "customer_approval", "filed", "completed"].includes(stage)
+  ) {
+    return stage;
+  }
+  const s = String(row.status || "TODO").toUpperCase();
+  if (s === "COMPLETED" || s === "DONE") return "completed";
+  if (s === "IN_REVIEW" || s === "REVIEW") return "review";
+  if (s === "IN_PROGRESS") return "in_progress";
+  return "pending";
+}
+
+function stageToDbStatus(stage: TaskStatus): string {
+  switch (stage) {
+    case "completed":
+      return "COMPLETED";
+    case "review":
+    case "customer_approval":
+      return "IN_REVIEW";
+    case "in_progress":
+    case "filed":
+      return "IN_PROGRESS";
+    default:
+      return "TODO";
+  }
+}
+
+function formatPriorityLabel(raw?: string | null): "Urgent" | "High" | "Medium" | "Low" {
+  const p = String(raw || "MEDIUM").toUpperCase();
+  if (p === "URGENT") return "Urgent";
+  if (p === "HIGH") return "High";
+  if (p === "LOW") return "Low";
+  return "Medium";
 }
 
 export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "client" }) {
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filterTab, setFilterTab] = useState<"all" | "my" | "pending" | "completed" | "overdue">("all");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const [tasks, setTasks] = useState<TaskItem[]>([
-    {
-      id: "t-1",
-      title: "GSTR-1 Monthly Return Filing (Sept 2026)",
-      client: "TechNova Solutions Pvt Ltd",
-      isMyTask: true,
-      priority: "Urgent",
-      status: "pending",
-      due: "20 Oct 2026",
-      isOverdue: true,
-      assignedTo: "CA Rajesh Sharma",
-      description: "Reconcile B2B outward supplies against tally sales register and submit to GSTN.",
-      attachments: [
-        { id: "att-1", name: "Sept_Sales_Register.xlsx", size: "1.4 MB", uploadedAt: "19 Oct 2026" },
-        { id: "att-2", name: "GSTR_1_Summary.pdf", size: "0.8 MB", uploadedAt: "19 Oct 2026" }
-      ],
-      comments: [
-        { id: "c-1", author: "CA Rajesh Sharma", avatar: "RS", text: "Please upload the revised B2B invoices.", timestamp: "Yesterday 11:20 AM" },
-        { id: "c-2", author: "You", avatar: "ME", text: "Uploaded updated Excel sheet with all 48 outward invoices.", timestamp: "Yesterday 02:40 PM" }
-      ],
-      history: [
-        { action: "Task created by System Compliance Engine", user: "System", timestamp: "15 Oct 2026" },
-        { action: "Attachments added", user: "You", timestamp: "19 Oct 2026" }
-      ]
-    },
-    {
-      id: "t-2",
-      title: "Form 26Q TDS Return Preparation",
-      client: "Apex Logistics India",
-      isMyTask: false,
-      priority: "High",
-      status: "in_progress",
-      due: "31 Oct 2026",
-      isOverdue: false,
-      assignedTo: "Senior Associate Priya",
-      description: "Verify Section 194C contractor deductions and lower rate certificates.",
-      attachments: [
-        { id: "att-3", name: "Form_26Q_Challans.pdf", size: "2.1 MB", uploadedAt: "18 Oct 2026" }
-      ],
-      comments: [
-        { id: "c-3", author: "Senior Associate Priya", avatar: "PA", text: "Challan 281 verification in progress.", timestamp: "20 Oct 2026" }
-      ],
-      history: [
-        { action: "Task created", user: "CA Rajesh Sharma", timestamp: "18 Oct 2026" },
-        { action: "Status moved to In Progress", user: "Senior Associate Priya", timestamp: "19 Oct 2026" }
-      ]
-    },
-    {
-      id: "t-3",
-      title: "ITR-2 Final Draft Client Approval",
-      client: "Abhinav Birajdar",
-      isMyTask: true,
-      priority: "High",
-      status: "customer_approval",
-      due: "28 Oct 2026",
-      isOverdue: false,
-      assignedTo: "CA Rajesh Sharma",
-      description: "Sent computation sheet via Client Portal for digital verification and Aadhaar OTP approval.",
-      attachments: [
-        { id: "att-4", name: "ITR2_Draft_Computation_AY2026.pdf", size: "1.1 MB", uploadedAt: "Yesterday" }
-      ],
-      comments: [
-        { id: "c-4", author: "CA Rajesh Sharma", avatar: "RS", text: "Draft prepared with New Tax Regime Section 115BAC.", timestamp: "Yesterday" }
-      ],
-      history: [
-        { action: "Draft computed & sent for approval", user: "CA Rajesh Sharma", timestamp: "Yesterday" }
-      ]
-    },
-    {
-      id: "t-4",
-      title: "GSTR-3B Monthly Return Submission",
-      client: "TechNova Solutions Pvt Ltd",
-      isMyTask: true,
-      priority: "High",
-      status: "filed",
-      due: "20 Oct 2026",
-      isOverdue: false,
-      assignedTo: "Senior Associate Priya",
-      description: "Successfully submitted to GSTN Portal with ARN #AA070926019208B.",
-      attachments: [
-        { id: "att-5", name: "GSTR3B_Acknowledgement_Receipt.pdf", size: "0.6 MB", uploadedAt: "20 Oct 2026" }
-      ],
-      comments: [],
-      history: [
-        { action: "Filed with GSTN ARN generated", user: "Senior Associate Priya", timestamp: "20 Oct 2026" }
-      ]
-    },
-    {
-      id: "t-5",
-      title: "Advance Tax Q2 Installment Challan 280 Payment",
-      client: "Abhinav Birajdar",
-      isMyTask: true,
-      priority: "Medium",
-      status: "completed",
-      due: "15 Sep 2026",
-      isOverdue: false,
-      assignedTo: "Self / Client",
-      description: "Deposited ₹25,000 Advance Tax via Income Tax e-Pay Tax Portal with BSR Code 002910.",
-      attachments: [
-        { id: "att-6", name: "Challan_280_Receipt_Paid.pdf", size: "0.4 MB", uploadedAt: "15 Sep 2026" }
-      ],
-      comments: [
-        { id: "c-5", author: "You", avatar: "ME", text: "Paid via HDFC Netbanking, receipt attached.", timestamp: "15 Sep 2026" }
-      ],
-      history: [
-        { action: "Payment completed & marked finished", user: "You", timestamp: "15 Sep 2026" }
-      ]
-    }
-  ]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [clientsList, setClientsList] = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [detailsTab, setDetailsTab] = useState<"overview" | "attachments" | "comments" | "history">("overview");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Create Task Modal state
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const [newClient, setNewClient] = useState("TechNova Solutions");
+  const [newClientId, setNewClientId] = useState("");
+  const [newClientLabel, setNewClientLabel] = useState("");
   const [newPriority, setNewPriority] = useState<"Urgent" | "High" | "Medium" | "Low">("High");
-  const [newDue, setNewDue] = useState("2026-10-31");
+  const [newDue, setNewDue] = useState(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
   const [newDescription, setNewDescription] = useState("");
   const [commentInput, setCommentInput] = useState("");
+
+  const actorName = user?.name || user?.email?.split("@")[0] || "You";
+
+  const fetchTasksAndClients = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const requests: Promise<Response>[] = [fetch("/api/tasks?limit=100")];
+      if (portal === "ca") {
+        requests.push(fetch("/api/clients?take=100"));
+      }
+      const [tasksRes, clientsRes] = await Promise.all(requests);
+
+      if (tasksRes?.ok) {
+        const json = await tasksRes.json().catch(() => ({}));
+        const now = Date.now();
+        const mapped: TaskItem[] = (json.tasks || []).map((row: any) => {
+          const status = mapRowToStage(row);
+          const dueTs = row.due_date ? new Date(row.due_date).getTime() : null;
+          const isOverdue = Boolean(dueTs && dueTs < now && status !== "completed" && status !== "filed");
+          const meta = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+          return {
+            id: row.id,
+            title: row.title,
+            client: row.client_name || meta.clientName || "Client Workspace",
+            clientId: row.client_id || null,
+            isMyTask: row.assigned_to === user.id || row.ca_id === user.id || row.client_id === user.id,
+            priority: formatPriorityLabel(row.priority),
+            status,
+            due: row.due_date
+              ? new Date(row.due_date).toLocaleDateString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "No Deadline",
+            dueRaw: row.due_date || null,
+            isOverdue,
+            assignedTo: row.assigned_to_name || "Assigned CA",
+            description: row.description || "Compliance workflow task.",
+            attachments: Array.isArray(meta.attachments) ? meta.attachments : [],
+            comments: Array.isArray(meta.comments) ? meta.comments : [],
+            history: Array.isArray(meta.history)
+              ? meta.history
+              : [
+                  {
+                    action: "Task created",
+                    user: row.assigned_to_name || "System",
+                    timestamp: row.created_at ? new Date(row.created_at).toLocaleDateString("en-IN") : "Recent",
+                  },
+                ],
+            rawMetadata: meta,
+          };
+        });
+        setTasks(mapped);
+      }
+
+      if (clientsRes?.ok) {
+        const cJson = await clientsRes.json().catch(() => ({}));
+        const cRows = (cJson.clients || []).map((c: any) => ({
+          id: c.id,
+          name: c.display_name || c.full_name || c.email || "Client",
+        }));
+        setClientsList(cRows);
+        if (!newClientId && cRows.length > 0) {
+          setNewClientId(cRows[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed loading tasks:", err);
+      toast.error("Could not fetch tasks.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, portal, newClientId]);
+
+  useRealtimeTasks(
+    user?.id || "",
+    () => { void fetchTasksAndClients(); },
+    () => { void fetchTasksAndClients(); },
+    () => { void fetchTasksAndClients(); }
+  );
+
+  useEffect(() => {
+    if (user) {
+      fetchTasksAndClients();
+    }
+  }, [user, fetchTasksAndClients]);
 
   const columns: { key: TaskStatus; title: string; badgeClass: string }[] = [
     { key: "pending", title: "Pending", badgeClass: "bg-slate-500/20 text-slate-300 border-slate-500/30" },
@@ -202,10 +229,9 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
     { key: "review", title: "Review", badgeClass: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
     { key: "customer_approval", title: "Customer Approval", badgeClass: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
     { key: "filed", title: "Filed", badgeClass: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30" },
-    { key: "completed", title: "Completed", badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" }
+    { key: "completed", title: "Completed", badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
   ];
 
-  // Filter Tasks
   const filteredTasks = tasks.filter((t) => {
     if (filterTab === "my" && !t.isMyTask) return false;
     if (filterTab === "pending" && t.status !== "pending") return false;
@@ -214,100 +240,278 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
 
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase();
-      return t.title.toLowerCase().includes(q) || t.client.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
+      return (
+        t.title.toLowerCase().includes(q) ||
+        t.client.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q)
+      );
     }
     return true;
   });
 
-  const handleMoveTask = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(tasks.map((t) => {
-      if (t.id === taskId) {
-        return {
-          ...t,
-          status: newStatus,
-          history: [
-            ...t.history,
-            { action: `Status moved to ${newStatus.replace("_", " ").toUpperCase()}`, user: "You", timestamp: "Just now" }
-          ]
-        };
+  const handleMoveTask = async (taskId: string, newStatus: TaskStatus) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+
+    const nextHistory = [
+      ...target.history,
+      {
+        action: `Status moved to ${newStatus.replace("_", " ").toUpperCase()}`,
+        user: actorName,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      },
+    ];
+
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: stageToDbStatus(newStatus),
+          metadata: {
+            ...target.rawMetadata,
+            workflowStage: newStatus,
+            history: nextHistory,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update stage");
+
+      const updated: TaskItem = {
+        ...target,
+        status: newStatus,
+        history: nextHistory,
+        rawMetadata: { ...target.rawMetadata, workflowStage: newStatus, history: nextHistory },
+      };
+
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+      if (selectedTask?.id === taskId) {
+        setSelectedTask(updated);
       }
-      return t;
-    }));
-    toast.success(`Task moved to ${newStatus.replace("_", " ").toUpperCase()}`);
-    if (selectedTask?.id === taskId) {
-      setSelectedTask({ ...selectedTask, status: newStatus });
+      toast.success(`Task moved to ${newStatus.replace("_", " ").toUpperCase()}`);
+    } catch {
+      toast.error("Could not persist task status update.");
     }
   };
 
   const handleCompleteTask = (task: TaskItem) => {
     handleMoveTask(task.id, "completed");
-    toast.success(`"${task.title}" marked as Completed!`);
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!selectedTask || !commentInput.trim()) return;
+    const text = commentInput.trim();
     const newComment: TaskComment = {
       id: `c-${Date.now()}`,
-      author: "You",
-      avatar: "ME",
-      text: commentInput.trim(),
-      timestamp: "Just now"
+      author: actorName,
+      avatar: actorName.slice(0, 2).toUpperCase(),
+      text,
+      timestamp: new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
     };
 
-    const updatedTask = {
-      ...selectedTask,
-      comments: [...selectedTask.comments, newComment],
-      history: [...selectedTask.history, { action: "Added a comment", user: "You", timestamp: "Just now" }]
-    };
+    const nextComments = [...selectedTask.comments, newComment];
+    const nextHistory = [
+      ...selectedTask.history,
+      { action: "Added a comment", user: actorName, timestamp: "Just now" },
+    ];
 
-    setTasks(tasks.map(t => t.id === selectedTask.id ? updatedTask : t));
-    setSelectedTask(updatedTask);
-    setCommentInput("");
-    toast.success("Comment added.");
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/tasks/${selectedTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metadata: {
+            ...selectedTask.rawMetadata,
+            comments: nextComments,
+            history: nextHistory,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to post comment");
+
+      const updatedTask: TaskItem = {
+        ...selectedTask,
+        comments: nextComments,
+        history: nextHistory,
+        rawMetadata: { ...selectedTask.rawMetadata, comments: nextComments, history: nextHistory },
+      };
+
+      setTasks((prev) => prev.map((t) => (t.id === selectedTask.id ? updatedTask : t)));
+      setSelectedTask(updatedTask);
+      setCommentInput("");
+      toast.success("Comment saved.");
+    } catch {
+      toast.error("Could not save comment.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedTask) return;
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("category", "TASK_ATTACHMENT");
+      if (selectedTask.clientId) {
+        fd.append("clientId", selectedTask.clientId);
+      }
+
+      const uploadRes = await fetch("/api/documents/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const uploadJson = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        throw new Error(uploadJson.error || "File upload failed");
+      }
+
+      const uploaded = uploadJson.data || uploadJson;
+      const newAtt: TaskAttachment = {
+        id: `att-${Date.now()}`,
+        docId: uploaded.id,
+        name: file.name,
+        size: `${Math.max(0.01, file.size / (1024 * 1024)).toFixed(2)} MB`,
+        uploadedAt: new Date().toLocaleDateString("en-IN"),
+      };
+
+      const nextAttachments = [...selectedTask.attachments, newAtt];
+      const nextHistory = [
+        ...selectedTask.history,
+        { action: `Attached ${file.name}`, user: actorName, timestamp: "Just now" },
+      ];
+
+      const patchRes = await fetch(`/api/tasks/${selectedTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metadata: {
+            ...selectedTask.rawMetadata,
+            attachments: nextAttachments,
+            history: nextHistory,
+          },
+        }),
+      });
+      if (!patchRes.ok) throw new Error("Failed to link attachment to task");
+
+      const updated: TaskItem = {
+        ...selectedTask,
+        attachments: nextAttachments,
+        history: nextHistory,
+        rawMetadata: { ...selectedTask.rawMetadata, attachments: nextAttachments, history: nextHistory },
+      };
+      setTasks((prev) => prev.map((t) => (t.id === selectedTask.id ? updated : t)));
+      setSelectedTask(updated);
+      toast.success(`Attached "${file.name}" to task.`);
+    } catch (err: any) {
+      toast.error(err.message || "Attachment upload failed.");
+    } finally {
+      setSubmitting(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDownloadAttachment = async (att: TaskAttachment) => {
+    if (!att.docId) {
+      toast.info("No linked storage file found for this entry.");
+      return;
+    }
+    window.open(`/api/documents/download?id=${encodeURIComponent(att.docId)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Only CA/Admin can delete tasks");
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      setSelectedTask(null);
+      toast.info("Task deleted.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete task.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const newTask: TaskItem = {
-      id: `t-${Date.now()}`,
-      title: newTitle,
-      client: newClient || "General Client",
-      isMyTask: true,
-      priority: newPriority,
-      status: "pending",
-      due: newDue,
-      isOverdue: false,
-      assignedTo: "CA Rajesh Sharma",
-      description: newDescription || "Task created from Customer Tasks workspace.",
-      attachments: [],
-      comments: [],
-      history: [{ action: "Task created by customer", user: "You", timestamp: "Just now" }]
-    };
+    setSubmitting(true);
+    try {
+      const selectedClientName =
+        clientsList.find((c) => c.id === newClientId)?.name || newClientLabel.trim() || actorName;
+      const historyInit = [
+        {
+          action: "Task created",
+          user: actorName,
+          timestamp: new Date().toLocaleDateString("en-IN"),
+        },
+      ];
 
-    setTasks([newTask, ...tasks]);
-    setNewTitle("");
-    setNewDescription("");
-    setShowNewTaskModal(false);
-    toast.success("New compliance task created successfully.");
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTitle.trim(),
+          description: newDescription.trim() || "Compliance workflow task.",
+          priority: newPriority.toUpperCase(),
+          status: "TODO",
+          dueDate: newDue || null,
+          clientId: newClientId || undefined,
+          metadata: {
+            workflowStage: "pending",
+            clientName: selectedClientName,
+            attachments: [],
+            comments: [],
+            history: historyInit,
+          },
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to create task");
+      }
+
+      setNewTitle("");
+      setNewDescription("");
+      setNewClientLabel("");
+      setShowNewTaskModal(false);
+      toast.success("Compliance task persisted to workspace.");
+      await fetchTasksAndClients();
+    } catch (err: any) {
+      toast.error(err.message || "Could not create task.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto text-white">
-      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <CheckSquare className="w-6 h-6 text-emerald-400" /> Customer Tasks & Compliance Workflow
+            <CheckSquare className="w-6 h-6 text-emerald-400" />{" "}
+            {portal === "ca" ? "Practice Tasks & Compliance Board" : "Tasks & Compliance Workflow"}
           </h1>
           <p className="text-xs text-gray-400 mt-1">
-            Track filings, document submissions, CA approvals, and milestone tasks across your tax engagements.
+            Track filings, document submissions, approvals, and milestone tasks across tax engagements.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* View Mode Toggle: Kanban vs List */}
+          <Button
+            onClick={fetchTasksAndClients}
+            variant="outline"
+            disabled={loading}
+            className="border-white/10 text-gray-300 hover:bg-white/5 text-xs rounded-xl"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loading ? "animate-spin" : ""}`} />
+          </Button>
           <div className="flex bg-[#111111] p-1 rounded-xl border border-white/10">
             <button
               onClick={() => setViewMode("kanban")}
@@ -338,15 +542,14 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
         </div>
       </div>
 
-      {/* 5 Filter Tabs: All, My Tasks, Pending, Completed, Overdue */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-2">
         <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
           {[
             { key: "all", label: "All Tasks", count: tasks.length },
-            { key: "my", label: "My Tasks", count: tasks.filter(t => t.isMyTask).length },
-            { key: "pending", label: "Pending Tasks", count: tasks.filter(t => t.status === "pending").length },
-            { key: "completed", label: "Completed Tasks", count: tasks.filter(t => t.status === "completed").length },
-            { key: "overdue", label: "Overdue Tasks", count: tasks.filter(t => t.isOverdue).length }
+            { key: "my", label: "My Tasks", count: tasks.filter((t) => t.isMyTask).length },
+            { key: "pending", label: "Pending Tasks", count: tasks.filter((t) => t.status === "pending").length },
+            { key: "completed", label: "Completed Tasks", count: tasks.filter((t) => t.status === "completed").length },
+            { key: "overdue", label: "Overdue Tasks", count: tasks.filter((t) => t.isOverdue).length },
           ].map((tab) => (
             <button
               key={tab.key}
@@ -358,16 +561,17 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
               }`}
             >
               <span>{tab.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                filterTab === tab.key ? "bg-emerald-950/60 text-emerald-300" : "bg-white/5 text-gray-400"
-              }`}>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  filterTab === tab.key ? "bg-emerald-950/60 text-emerald-300" : "bg-white/5 text-gray-400"
+                }`}
+              >
                 {tab.count}
               </span>
             </button>
           ))}
         </div>
 
-        {/* Search Bar */}
         <div className="relative w-full sm:w-64 shrink-0">
           <input
             type="text"
@@ -379,26 +583,36 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
         </div>
       </div>
 
-      {/* VIEW 1: KANBAN BOARD */}
-      {viewMode === "kanban" && (
+      {loading ? (
+        <div className="p-12 bg-[#111111] border border-white/10 rounded-2xl flex items-center justify-center gap-2 text-xs text-gray-400">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" /> Loading compliance tasks...
+        </div>
+      ) : viewMode === "kanban" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 overflow-x-auto pb-4">
           {columns.map((col) => {
             const colTasks = filteredTasks.filter((t) => t.status === col.key);
             return (
               <div
                 key={col.key}
-                className="bg-[#111111] border border-white/10 rounded-2xl p-3 flex flex-col min-h-[550px] shadow-lg"
+                className="bg-[#111111] border border-white/10 rounded-2xl p-3 flex flex-col min-h-[520px] shadow-lg"
               >
-                {/* Column Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-white/10">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`w-2 h-2 rounded-full ${
-                      col.key === 'completed' ? 'bg-emerald-500' :
-                      col.key === 'filed' ? 'bg-cyan-400' :
-                      col.key === 'customer_approval' ? 'bg-purple-400' :
-                      col.key === 'review' ? 'bg-amber-400' :
-                      col.key === 'in_progress' ? 'bg-blue-400' : 'bg-gray-400'
-                    }`}></span>
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        col.key === "completed"
+                          ? "bg-emerald-500"
+                          : col.key === "filed"
+                          ? "bg-cyan-400"
+                          : col.key === "customer_approval"
+                          ? "bg-purple-400"
+                          : col.key === "review"
+                          ? "bg-amber-400"
+                          : col.key === "in_progress"
+                          ? "bg-blue-400"
+                          : "bg-gray-400"
+                      }`}
+                    />
                     <h3 className="font-bold text-xs text-white truncate">{col.title}</h3>
                   </div>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${col.badgeClass}`}>
@@ -406,7 +620,6 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
                   </span>
                 </div>
 
-                {/* Column Task Cards */}
                 <div className="space-y-2.5 mt-3 flex-1 overflow-y-auto">
                   {colTasks.length === 0 ? (
                     <div className="h-32 border border-dashed border-white/5 rounded-xl flex items-center justify-center text-gray-500 text-[10px]">
@@ -416,18 +629,25 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
                     colTasks.map((task) => (
                       <div
                         key={task.id}
-                        onClick={() => { setSelectedTask(task); setDetailsTab("overview"); }}
+                        onClick={() => {
+                          setSelectedTask(task);
+                          setDetailsTab("overview");
+                        }}
                         className="p-3 bg-[#18181b] hover:bg-[#202024] border border-white/10 hover:border-emerald-500/40 rounded-xl transition-all cursor-pointer space-y-2 group shadow-sm"
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-400 truncate max-w-[120px]">
                             {task.client}
                           </span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-                            task.priority === "Urgent" ? "bg-red-500/20 text-red-300 border border-red-500/30" :
-                            task.priority === "High" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
-                            "bg-white/5 text-gray-300"
-                          }`}>
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                              task.priority === "Urgent"
+                                ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                                : task.priority === "High"
+                                ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                : "bg-white/5 text-gray-300"
+                            }`}
+                          >
                             {task.priority}
                           </span>
                         </div>
@@ -462,108 +682,119 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
             );
           })}
         </div>
-      )}
-
-      {/* VIEW 2: ITEMIZED LIST VIEW */}
-      {viewMode === "list" && (
+      ) : (
         <div className="bg-[#111111] rounded-2xl border border-white/10 overflow-hidden shadow-xl">
-          <table className="w-full text-left text-xs text-gray-300">
-            <thead className="bg-[#18181b] text-white font-semibold border-b border-white/10">
-              <tr>
-                <th className="py-3.5 px-4">Task Title</th>
-                <th className="py-3.5 px-4">Client / Scope</th>
-                <th className="py-3.5 px-4">Priority</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Due Date</th>
-                <th className="py-3.5 px-4">Assigned To</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredTasks.map((t) => (
-                <tr key={t.id} className="hover:bg-[#18181b]/50 transition-colors">
-                  <td className="py-3.5 px-4 font-bold text-white">
-                    <span 
-                      className="cursor-pointer hover:text-emerald-400"
-                      onClick={() => { setSelectedTask(t); setDetailsTab("overview"); }}
-                    >
-                      {t.title}
-                    </span>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-400 font-normal mt-0.5">
-                      <span>{t.attachments.length} files attached</span>
-                      <span>• {t.comments.length} comments</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 text-gray-300 font-medium">{t.client}</td>
-                  <td className="py-3.5 px-4">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      t.priority === "Urgent" ? "bg-red-500/20 text-red-300 border border-red-500/30" :
-                      t.priority === "High" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
-                      "bg-white/5 text-gray-300"
-                    }`}>
-                      {t.priority}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      {t.status.replace("_", " ").toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 font-mono">
-                    <span className={t.isOverdue ? "text-red-400 font-bold" : ""}>{t.due}</span>
-                  </td>
-                  <td className="py-3.5 px-4 text-gray-300">{t.assignedTo}</td>
-                  <td className="py-3.5 px-4 text-right space-x-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => { setSelectedTask(t); setDetailsTab("overview"); }}
-                      className="text-emerald-400 hover:text-emerald-300 text-xs h-7 px-2"
-                    >
-                      Details
-                    </Button>
-                    {t.status !== "completed" && (
+          {filteredTasks.length === 0 ? (
+            <div className="p-12 text-center text-xs text-gray-400">No tasks match your filter.</div>
+          ) : (
+            <table className="w-full text-left text-xs text-gray-300">
+              <thead className="bg-[#18181b] text-white font-semibold border-b border-white/10">
+                <tr>
+                  <th className="py-3.5 px-4">Task Title</th>
+                  <th className="py-3.5 px-4">Client / Scope</th>
+                  <th className="py-3.5 px-4">Priority</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Due Date</th>
+                  <th className="py-3.5 px-4">Assigned To</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredTasks.map((t) => (
+                  <tr key={t.id} className="hover:bg-[#18181b]/50 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-white">
+                      <span
+                        className="cursor-pointer hover:text-emerald-400"
+                        onClick={() => {
+                          setSelectedTask(t);
+                          setDetailsTab("overview");
+                        }}
+                      >
+                        {t.title}
+                      </span>
+                      <div className="flex items-center gap-2 text-[10px] text-gray-400 font-normal mt-0.5">
+                        <span>{t.attachments.length} files attached</span>
+                        <span>• {t.comments.length} comments</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-300 font-medium">{t.client}</td>
+                    <td className="py-3.5 px-4">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          t.priority === "Urgent"
+                            ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                            : t.priority === "High"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            : "bg-white/5 text-gray-300"
+                        }`}
+                      >
+                        {t.priority}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {t.status.replace("_", " ").toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono">
+                      <span className={t.isOverdue ? "text-red-400 font-bold" : ""}>{t.due}</span>
+                    </td>
+                    <td className="py-3.5 px-4 text-gray-300">{t.assignedTo}</td>
+                    <td className="py-3.5 px-4 text-right space-x-1">
                       <Button
                         size="sm"
-                        onClick={() => handleCompleteTask(t)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-2 font-semibold"
-                        title="Mark Complete"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedTask(t);
+                          setDetailsTab("overview");
+                        }}
+                        className="text-emerald-400 hover:text-emerald-300 text-xs h-7 px-2"
                       >
-                        <Check className="w-3.5 h-3.5 mr-1" /> Complete
+                        Details
                       </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      {t.status !== "completed" && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleCompleteTask(t)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-2 font-semibold"
+                        >
+                          <Check className="w-3.5 h-3.5 mr-1" /> Complete
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
-      {/* TASK DETAILS MODAL (Details, Attachments, Comments, History, Completion) */}
       {selectedTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-2xl bg-[#111111] border border-white/10 rounded-2xl p-6 sm:p-8 space-y-5 text-white shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
               <div>
                 <span className="text-[10px] font-mono uppercase font-bold text-emerald-400">
-                  {selectedTask.client} • {selectedTask.priority} Priority • Status: {selectedTask.status.replace("_", " ").toUpperCase()}
+                  {selectedTask.client} • {selectedTask.priority} Priority •{" "}
+                  {selectedTask.status.replace("_", " ").toUpperCase()}
                 </span>
                 <h3 className="text-lg font-bold text-white mt-0.5">{selectedTask.title}</h3>
-                <span className="text-xs text-gray-400 font-mono">Due: {selectedTask.due} • Assignee: {selectedTask.assignedTo}</span>
+                <span className="text-xs text-gray-400 font-mono">
+                  Due: {selectedTask.due} • Assignee: {selectedTask.assignedTo}
+                </span>
               </div>
               <button onClick={() => setSelectedTask(null)} className="text-gray-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Inner Subtabs: Overview | Attachments | Comments | History */}
             <div className="flex gap-2 border-b border-white/10 pb-2 text-xs">
               {[
                 { key: "overview", label: "Task Details" },
                 { key: "attachments", label: `Attachments (${selectedTask.attachments.length})` },
                 { key: "comments", label: `Comments (${selectedTask.comments.length})` },
-                { key: "history", label: "Audit History" }
+                { key: "history", label: "Audit History" },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -577,7 +808,6 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
               ))}
             </div>
 
-            {/* Tab 1: Overview */}
             {detailsTab === "overview" && (
               <div className="space-y-4 text-xs">
                 <div className="p-3.5 bg-[#18181b] rounded-xl border border-white/5 space-y-2">
@@ -585,7 +815,6 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
                   <p className="text-gray-300 leading-relaxed">{selectedTask.description}</p>
                 </div>
 
-                {/* Advance Workflow Stage */}
                 <div className="space-y-2 pt-2">
                   <label className="text-xs font-semibold text-gray-300">Advance Workflow Stage:</label>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-[10px]">
@@ -607,29 +836,24 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
               </div>
             )}
 
-            {/* Tab 2: Attachments */}
             {detailsTab === "attachments" && (
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white">Files & Document Attachments:</span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleUploadAttachment}
+                    className="hidden"
+                  />
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      const newAtt: TaskAttachment = {
-                        id: `att-${Date.now()}`,
-                        name: "Uploaded_Document_Evidence.pdf",
-                        size: "1.2 MB",
-                        uploadedAt: "Just now"
-                      };
-                      const updated = { ...selectedTask, attachments: [...selectedTask.attachments, newAtt] };
-                      setTasks(tasks.map(t => t.id === selectedTask.id ? updated : t));
-                      setSelectedTask(updated);
-                      toast.success("Document attached to task.");
-                    }}
+                    disabled={submitting}
+                    onClick={() => fileInputRef.current?.click()}
                     className="border-white/10 text-xs h-7"
                   >
-                    <Upload className="w-3 h-3 mr-1" /> Attach New File
+                    <Upload className="w-3 h-3 mr-1" /> {submitting ? "Uploading..." : "Attach File"}
                   </Button>
                 </div>
 
@@ -649,7 +873,7 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => toast.success(`Downloading ${att.name}`)}
+                          onClick={() => handleDownloadAttachment(att)}
                           className="text-gray-300 hover:text-white h-7 px-2"
                         >
                           <Download className="w-3.5 h-3.5" />
@@ -661,7 +885,6 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
               </div>
             )}
 
-            {/* Tab 3: Comments */}
             {detailsTab === "comments" && (
               <div className="space-y-3 text-xs">
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
@@ -686,12 +909,15 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
                     placeholder="Add a task comment or clarification..."
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleAddComment(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddComment();
+                    }}
                     className="flex-1 bg-[#18181b] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
                   />
                   <Button
                     size="sm"
                     onClick={handleAddComment}
+                    disabled={submitting}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs"
                   >
                     <Send className="w-3.5 h-3.5 mr-1" /> Post
@@ -700,7 +926,6 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
               </div>
             )}
 
-            {/* Tab 4: History */}
             {detailsTab === "history" && (
               <div className="space-y-2 text-xs">
                 <span className="font-bold text-white">Task Audit Trail:</span>
@@ -718,16 +943,28 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
               </div>
             )}
 
-            {/* Modal Bottom Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-white/10">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedTask(null)}
-                className="border-white/10 text-xs"
-              >
-                Close
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedTask(null)}
+                  className="border-white/10 text-xs"
+                >
+                  Close
+                </Button>
+                {portal === "ca" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={submitting}
+                    onClick={() => handleDeleteTask(selectedTask.id)}
+                    className="text-xs text-rose-400 hover:bg-rose-500/10"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                  </Button>
+                )}
+              </div>
 
               {selectedTask.status !== "completed" && (
                 <Button
@@ -738,7 +975,7 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
                   }}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
                 >
-                  <CheckCircle2 className="w-4 h-4 mr-1.5" /> Mark Task as Completed
+                  <CheckCircle2 className="w-4 h-4 mr-1.5" /> Mark Task Completed
                 </Button>
               )}
             </div>
@@ -746,7 +983,6 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
         </div>
       )}
 
-      {/* CREATE TASK MODAL */}
       {showNewTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md bg-[#111111] border border-white/10 rounded-2xl p-6 space-y-4 text-white shadow-2xl">
@@ -772,15 +1008,33 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
                 />
               </div>
 
-              <div>
-                <label className="block text-gray-300 mb-1">Client / Project</label>
-                <input
-                  type="text"
-                  value={newClient}
-                  onChange={(e) => setNewClient(e.target.value)}
-                  className="w-full bg-[#18181b] border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
+              {portal === "ca" && clientsList.length > 0 ? (
+                <div>
+                  <label className="block text-gray-300 mb-1">Client Account</label>
+                  <select
+                    value={newClientId}
+                    onChange={(e) => setNewClientId(e.target.value)}
+                    className="w-full bg-[#18181b] border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {clientsList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-gray-300 mb-1">Engagement / Project Scope</label>
+                  <input
+                    type="text"
+                    value={newClientLabel}
+                    onChange={(e) => setNewClientLabel(e.target.value)}
+                    placeholder="e.g. ITR Filing FY 2025-26"
+                    className="w-full bg-[#18181b] border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -819,11 +1073,22 @@ export function UnifiedTasksWorkflow({ portal = "client" }: { portal: "ca" | "cl
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowNewTaskModal(false)} className="border-white/10 text-xs">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowNewTaskModal(false)}
+                  className="border-white/10 text-xs"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
-                  Create Task
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={submitting}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                >
+                  {submitting ? "Creating..." : "Create Task"}
                 </Button>
               </div>
             </form>

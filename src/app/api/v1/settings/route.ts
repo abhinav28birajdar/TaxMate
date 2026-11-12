@@ -1,23 +1,16 @@
 import { NextRequest } from 'next/server';
 import { fail, ok } from '@/lib/backend/response';
-import { requireAuth, supabaseAdmin } from '@/lib/backend/supabase';
+import { requireAuth } from '@/lib/backend/supabase';
+import { getSettings, updateSettings } from '@/lib/backend/settings-service';
 import { settingsSchema } from '@/lib/backend/validation';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-
-    const { data, error } = await supabaseAdmin
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', auth.userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
-
-    return ok({ settings: data || null }, 'Settings fetched');
+    const settings = await getSettings(auth.userId);
+    return ok({ settings }, 'Settings fetched');
   } catch (error) {
     return fail(error);
   }
@@ -29,30 +22,8 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const parsed = settingsSchema.parse(body);
 
-    const { data, error } = await supabaseAdmin
-      .from('user_settings')
-      .upsert(
-        {
-          user_id: auth.userId,
-          theme: parsed.theme || 'system',
-          language: parsed.language,
-          timezone: parsed.timezone,
-          notification_settings: {
-            email: parsed.emailNotifications,
-            push: parsed.pushNotifications,
-            marketing: parsed.marketingEmails,
-          },
-        },
-        { onConflict: 'user_id' }
-      )
-      .select('*')
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return ok({ settings: data }, 'Settings updated');
+    const settings = await updateSettings(auth.userId, parsed);
+    return ok({ settings }, 'Settings updated');
   } catch (error) {
     return fail(error);
   }

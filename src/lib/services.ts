@@ -372,22 +372,23 @@ export const documentService = {
   },
 
   async upload(file: File, userId: string, folder: string = 'documents') {
-    const fileExt = file.name.split('.').pop();
+    const rawExt = file.name.split('.').pop() || 'bin';
+    const fileExt = rawExt.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) || 'bin';
     const fileName = `${userId}/${folder}/${Date.now()}.${fileExt}`;
 
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('documents')
       .upload(fileName, file, { upsert: true });
 
     if (uploadError) throw uploadError;
 
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = await supabase.storage
       .from('documents')
-      .getPublicUrl(fileName);
+      .createSignedUrl(fileName, 3600);
 
     return {
       path: fileName,
-      url: urlData.publicUrl,
+      url: urlData?.signedUrl || fileName,
       name: file.name
     };
   },

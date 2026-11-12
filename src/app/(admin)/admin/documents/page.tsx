@@ -1,128 +1,182 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { 
-  FolderLock, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  ShieldAlert, 
-  Eye, 
-  Download, 
-  Trash2, 
-  HardDrive, 
-  Sparkles,
-  Layers,
-  FileText
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import React, { useCallback, useEffect, useState } from 'react';
+import { FileText, Search, Download, CheckCircle2, Trash2, Loader2, RefreshCw } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toast } from 'sonner';
 
-export default function AdminDocumentManagementPage() {
-  const [search, setSearch] = useState("");
-  const [selectedCat, setSelectedCat] = useState("all");
+interface AdminDocItem {
+  id: string;
+  title: string;
+  fileName: string;
+  category: string;
+  fileSize: number;
+  status: string;
+  verified: boolean;
+  ownerName: string;
+  createdAt: string;
+}
 
-  const [docs, setDocs] = useState([
-    { id: "d-1", name: "Form_16_Part_A_B_AY2026.pdf", category: "Form 16", owner: "Abhinav Birajdar", size: "2.4 MB", ocrStatus: "Extracted", uploaded: "Today", flagged: false },
-    { id: "d-2", name: "Zerodha_Capital_Gains_P&L.xlsx", category: "Investment Proofs", owner: "Ananya Deshmukh", size: "3.2 MB", ocrStatus: "Extracted", uploaded: "Yesterday", flagged: false },
-    { id: "d-3", name: "Blurry_Medical_Invoice.jpg", category: "Insurance Documents", owner: "Vikramaditya Rao", size: "0.4 MB", ocrStatus: "Failed", uploaded: "2 days ago", flagged: true },
-    { id: "d-4", name: "Registered_Sale_Deed_Commercial.pdf", category: "Property Documents", owner: "TechNova Solutions", size: "8.5 MB", ocrStatus: "Extracted", uploaded: "3 days ago", flagged: false },
-    { id: "d-5", name: "ICAI_COP_Certificate_2026.pdf", category: "Business Documents", owner: "CA Rajesh Sharma", size: "1.8 MB", ocrStatus: "Verified", uploaded: "5 days ago", flagged: false }
-  ]);
+export default function AdminDocumentsPage() {
+  const [docs, setDocs] = useState<AdminDocItem[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const loadDocs = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/overview?section=documents', { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to load documents');
+      setDocs(Array.isArray(json.items) ? json.items : []);
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to load vault audit');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDocs();
+  }, [loadDocs]);
+
+  const handleVerify = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/overview', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ section: 'documents', id, status: 'VERIFIED' }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Verification failed');
+      toast.success('Document marked verified');
+      await loadDocs();
+    } catch (err: any) {
+      toast.error(err?.message || 'Action failed');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/overview?section=documents&id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Delete failed');
+      toast.success('Document removed');
+      await loadDocs();
+    } catch (err: any) {
+      toast.error(err?.message || 'Delete failed');
+    }
+  };
+
+  const handleDownload = async (id: string) => {
+    try {
+      const res = await fetch(`/api/documents/download?id=${encodeURIComponent(id)}`, { credentials: 'include' });
+      const json = await res.json();
+      const targetUrl = json.url || json.signedUrl;
+      if (!targetUrl) throw new Error(json.error || 'Signed URL unavailable');
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      toast.error(err?.message || 'Download failed');
+    }
+  };
+
+  const filtered = docs.filter((d) => {
+    const q = search.trim().toLowerCase();
+    return !q || d.title.toLowerCase().includes(q) || d.ownerName.toLowerCase().includes(q) || d.category.toLowerCase().includes(q);
+  });
 
   return (
-    <div className="space-y-6 text-white">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <FolderLock className="w-6 h-6 text-emerald-400" /> Platform Document Vault & Storage Infrastructure
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <FileText className="w-6 h-6 text-lime-500" /> Document Vault Audit
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Global 256-bit encrypted documents repository, Tesseract OCR queue, and storage quota management.
-          </p>
+          <p className="text-sm text-slate-400">Inspect uploaded tax files, verify compliance records, or inspect storage links</p>
         </div>
-
-        <Button
-          onClick={() => toast.success("Storage audit scan completed. Zero integrity violations detected.")}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-[0_0_20px_rgba(5,150,105,0.4)]"
-        >
-          <HardDrive className="w-3.5 h-3.5 mr-1.5" /> Run Integrity Audit
+        <Button variant="outline" size="sm" onClick={loadDocs} className="border-slate-800 bg-slate-900 text-slate-300">
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
 
-      {/* Storage Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">Total Vault Files</span>
-          <div className="text-xl font-bold text-white">14,290</div>
-          <span className="text-[10px] text-emerald-400">Across 15 categories</span>
-        </div>
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">Total Storage Allocated</span>
-          <div className="text-xl font-bold font-mono text-white">284.5 GB</div>
-          <span className="text-[10px] text-gray-500">AWS S3 Mumbai Region</span>
-        </div>
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">OCR Recognition Success</span>
-          <div className="text-xl font-bold text-emerald-400">99.4%</div>
-          <span className="text-[10px] text-gray-500">Tesseract Engine</span>
-        </div>
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">Flagged / Corrupt Files</span>
-          <div className="text-xl font-bold text-amber-400">1</div>
-          <span className="text-[10px] text-amber-400">Resolution required</span>
-        </div>
+      <div className="relative max-w-md">
+        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+        <Input
+          placeholder="Search file title, uploader, or category..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 bg-slate-900 border-slate-800 text-slate-100"
+        />
       </div>
 
-      {/* Documents Table */}
-      <div className="bg-[#111111] rounded-2xl border border-white/10 overflow-hidden shadow-xl">
-        <table className="w-full text-left text-xs text-gray-300">
-          <thead className="bg-[#18181b] text-white font-semibold border-b border-white/10">
-            <tr>
-              <th className="py-3.5 px-4">Document Title</th>
-              <th className="py-3.5 px-4">Category</th>
-              <th className="py-3.5 px-4">Uploader / Owner</th>
-              <th className="py-3.5 px-4">Size</th>
-              <th className="py-3.5 px-4">OCR Status</th>
-              <th className="py-3.5 px-4">Uploaded</th>
-              <th className="py-3.5 px-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {docs.map((d) => (
-              <tr key={d.id} className="hover:bg-[#18181b]/50 transition-colors">
-                <td className="py-3.5 px-4 font-bold text-white flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>{d.name}</span>
-                </td>
-                <td className="py-3.5 px-4">
-                  <span className="px-2 py-0.5 rounded-md bg-[#18181b] border border-white/5 text-emerald-300">
-                    {d.category}
-                  </span>
-                </td>
-                <td className="py-3.5 px-4 text-gray-200">{d.owner}</td>
-                <td className="py-3.5 px-4 font-mono text-gray-400">{d.size}</td>
-                <td className="py-3.5 px-4">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    d.ocrStatus === "Failed" ? "bg-red-500/20 text-red-400 border border-red-500/30" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                  }`}>
-                    {d.ocrStatus}
-                  </span>
-                </td>
-                <td className="py-3.5 px-4 text-gray-400">{d.uploaded}</td>
-                <td className="py-3.5 px-4 text-right space-x-1">
-                  <Button size="sm" variant="ghost" onClick={() => toast.success(`Downloaded ${d.name}`)} className="text-gray-300 h-7 px-2">
-                    <Download className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => toast.info("Viewing document logs")} className="text-emerald-400 h-7 px-2">
-                    <Eye className="w-3.5 h-3.5" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Card className="bg-slate-900 border-slate-800 p-6">
+        <div className="rounded-xl border border-slate-800 overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-950">
+              <TableRow className="border-slate-800">
+                <TableHead className="text-slate-400">Document Name</TableHead>
+                <TableHead className="text-slate-400">Uploader</TableHead>
+                <TableHead className="text-slate-400">Category</TableHead>
+                <TableHead className="text-slate-400">Size</TableHead>
+                <TableHead className="text-slate-400">Status</TableHead>
+                <TableHead className="text-slate-400 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow className="border-slate-800">
+                  <TableCell colSpan={6} className="py-12 text-center text-slate-400">
+                    <Loader2 className="w-5 h-5 animate-spin inline mr-2 text-lime-500" /> Loading documents...
+                  </TableCell>
+                </TableRow>
+              ) : filtered.length === 0 ? (
+                <TableRow className="border-slate-800">
+                  <TableCell colSpan={6} className="py-12 text-center text-slate-400">
+                    No uploaded documents found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((d) => (
+                  <TableRow key={d.id} className="border-slate-800 hover:bg-slate-950/50">
+                    <TableCell className="font-semibold text-slate-100 text-sm">{d.title}</TableCell>
+                    <TableCell className="text-xs text-slate-300">{d.ownerName}</TableCell>
+                    <TableCell><Badge className="bg-slate-800 text-slate-300 text-[10px]">{d.category}</Badge></TableCell>
+                    <TableCell className="text-xs font-mono text-slate-400">
+                      {d.fileSize > 0 ? `${(d.fileSize / 1024).toFixed(1)} KB` : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={d.verified ? 'bg-lime-600/20 text-lime-400 text-[10px]' : 'bg-amber-500/20 text-amber-400 text-[10px]'}>
+                        {d.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button size="sm" variant="outline" onClick={() => handleDownload(d.id)} className="border-slate-800 text-slate-300 h-7 text-xs">
+                        <Download className="w-3.5 h-3.5 mr-1" /> Open
+                      </Button>
+                      {!d.verified && (
+                        <Button size="sm" variant="outline" onClick={() => handleVerify(d.id)} className="border-lime-500/30 text-lime-400 h-7 text-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Verify
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => handleDelete(d.id)} className="text-red-400 h-7">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
     </div>
   );
 }

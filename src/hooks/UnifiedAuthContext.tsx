@@ -10,7 +10,7 @@ import { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
-import { PUBLIC_ROUTES, getAuthRedirectForRole, getDashboardPathForRole, normalizeRole } from '@/lib/auth-routing';
+import { PUBLIC_ROUTES, getAuthRedirectForRole, getDashboardPathForRole, normalizeRole, isPublicPath } from '@/lib/auth-routing';
 
 export type UserRole = 'SUPER_ADMIN' | 'CA' | 'CLIENT' | 'STAFF' | null;
 export type AccountStatus = 'PENDING_VERIFICATION' | 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
@@ -36,7 +36,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   
   // Methods
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, redirectTo?: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, role: UserRole, metadata?: Record<string, string>) => Promise<void>;
   resendEmailVerification: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -193,19 +193,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const isAuthenticated = !!user && !!session;
 
-    const isPublicRoute = pathname
-      ? PUBLIC_ROUTES.some((route) => route === '/' ? pathname === '/' : pathname === route || pathname.startsWith(`${route}/`))
-      : false;
+    const isPublicRoute = pathname ? isPublicPath(pathname) : false;
 
     if (!isAuthenticated && !isPublicRoute) {
       router.replace(`/login?redirectTo=${encodeURIComponent(pathname || '/landing')}`);
-    } else if (isAuthenticated && ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email'].some((route) => pathname?.startsWith(route))) {
-      router.replace(getAuthRedirectForRole(user?.role));
+    } else if (isAuthenticated && ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/admin/login', '/portal/login'].some((route) => pathname === route || pathname?.startsWith(`${route}/`))) {
+      const searchRedirect =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('redirectTo')
+          : null;
+      const safeRedirect =
+        searchRedirect &&
+        searchRedirect.startsWith('/') &&
+        !searchRedirect.startsWith('//') &&
+        !['/login', '/register', '/admin-login'].includes(searchRedirect)
+          ? searchRedirect
+          : null;
+      router.replace(safeRedirect || getAuthRedirectForRole(user?.role));
     }
   }, [isLoading, pathname, router, session, user]);
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, redirectTo?: string) => {
       try {
         const { error, data } = await supabase.auth.signInWithPassword({
           email,
@@ -225,8 +234,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (data.session) {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .maybeSingle();
+          const targetRole = prof?.role || data.user?.app_metadata?.role || data.user?.user_metadata?.role || role;
+          const safeRedirect =
+            redirectTo &&
+            redirectTo.startsWith('/') &&
+            !redirectTo.startsWith('//') &&
+            !['/login', '/register', '/admin-login'].includes(redirectTo)
+              ? redirectTo
+              : null;
           toast.success('Signed in successfully');
-          router.push(getDashboardPathForRole(data.user?.app_metadata?.role || role));
+          router.push(safeRedirect || getDashboardPathForRole(targetRole));
         }
       } catch (error) {
         throw error;

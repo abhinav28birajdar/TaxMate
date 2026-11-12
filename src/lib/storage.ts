@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 
 let _supabase: any = null;
 function getSupabase() {
+  if (typeof window !== 'undefined') {
+    throw new Error('Server storage helper cannot be used in browser runtime.');
+  }
   if (!_supabase) {
     _supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
@@ -18,6 +21,8 @@ export const BUCKETS = {
     RECEIPTS: 'receipts',
     CA_ASSETS: 'ca-assets',
     CHAT_FILES: 'chat-files',
+    VERIFICATION_DOCS: 'verification-documents',
+    UPLOADS: 'uploads',
 } as const;
 
 const ALLOWED_TYPES = [

@@ -1,47 +1,46 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  ShieldCheck, 
-  ArrowLeft, 
-  RefreshCw, 
-  Sparkles, 
-  Smartphone, 
-  Mail,
-  CheckCircle2
-} from 'lucide-react';
+import { ShieldCheck, RefreshCw, Mail, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
+import { createClient } from '@/utils/supabase/client';
+import { getDashboardPathForRole } from '@/lib/auth-routing';
 import { toast } from 'sonner';
 
 export default function VerifyOTPPage() {
   const router = useRouter();
+  const { user, role, verifyOTP } = useAuth();
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState<boolean>(false);
-  const [resendTimer, setResendTimer] = useState<number>(30);
-  const [channel, setChannel] = useState<'phone' | 'email'>('phone');
+  const [sending, setSending] = useState<boolean>(false);
+  const [resendTimer, setResendTimer] = useState<number>(0);
+  const [channel, setChannel] = useState<'email' | 'phone'>('email');
+  const [target, setTarget] = useState<string>('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
+    if (user?.email && !target) {
+      setTarget(user.email);
     }
+  }, [user, target]);
+
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer((prev) => Math.max(0, prev - 1));
+    }, 1000);
     return () => clearInterval(interval);
   }, [resendTimer]);
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
-
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
-
-    // Auto focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -57,7 +56,6 @@ export default function VerifyOTPPage() {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').slice(0, 6);
     if (!/^\d+$/.test(pastedData)) return;
-
     const digits = pastedData.split('');
     const newOtp = [...otp];
     digits.forEach((digit, i) => {
@@ -69,86 +67,151 @@ export default function VerifyOTPPage() {
     }
   };
 
-  const handleVerify = (e: React.FormEvent) => {
+  const handleSendOtp = async () => {
+    if (!target.trim()) {
+      toast.error(
+        channel === 'email'
+          ? 'Please enter your email address first.'
+          : 'Please enter your phone number in E.164 format (+91...).'
+      );
+      return;
+    }
+
+    setSending(true);
+    try {
+      if (channel === 'email') {
+        const res = await fetch('/api/auth/send-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: target.trim() }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to dispatch OTP email');
+      } else {
+        const supabase = createClient();
+        const { error } = await supabase.auth.signInWithOtp({ phone: target.trim() });
+        if (error) throw new Error(error.message);
+      }
+      setResendTimer(30);
+      toast.success(`Verification OTP dispatched via ${channel === 'email' ? 'Email' : 'SMS'}.`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to send OTP');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     const code = otp.join('');
-    if (code.length !== 6) {
-      toast.error('Please enter complete 6-digit verification code.');
+    if (code.length !== 6 || !target.trim()) {
+      toast.error('Please provide your destination and complete 6-digit OTP code.');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast.success('Identity verified successfully!');
-      router.push('/choose-role');
-    }, 1000);
-  };
+    try {
+      if (channel === 'email') {
+        const res = await fetch('/api/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: target.trim(), otp: code }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Invalid or expired OTP');
+        }
+        toast.success('Email OTP verified successfully!');
+      } else {
+        await verifyOTP(target.trim(), code);
+      }
 
-  const handleResend = () => {
-    if (resendTimer > 0) return;
-    setResendTimer(30);
-    toast.success(`New verification code sent via ${channel === 'phone' ? 'SMS / WhatsApp' : 'Email'}.`);
+      router.push(user ? getDashboardPathForRole(role) : '/choose-role');
+    } catch (err: any) {
+      toast.error(err?.message || 'OTP verification failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl rounded-3xl overflow-hidden">
+      <Card className="border-white/10 bg-[#111111]/90 text-white shadow-2xl rounded-2xl overflow-hidden">
         <CardHeader className="space-y-2 text-center pb-4">
-          <div className="mx-auto w-12 h-12 rounded-2xl bg-lime-600/10 text-lime-600 flex items-center justify-center mb-1">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-1 border border-emerald-500/20">
             <ShieldCheck className="w-6 h-6" />
           </div>
-          <CardTitle className="text-2xl font-bold font-display text-slate-900 dark:text-white">
-            Two-Step Verification
-          </CardTitle>
-          <CardDescription className="text-xs text-slate-500">
-            We sent a 6-digit one-time password (OTP) to your registered {channel === 'phone' ? 'phone +91 ••••• ••412' : 'email a••••@domain.com'}.
+          <CardTitle className="text-2xl font-bold text-white">Two-Step Verification</CardTitle>
+          <CardDescription className="text-xs text-gray-400">
+            Verify your identity with a 6-digit one-time password.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5">
           <div className="flex justify-center gap-2">
-            <Button
-              type="button"
-              variant={channel === 'phone' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setChannel('phone')}
-              className={`text-xs rounded-xl ${
-                channel === 'phone' 
-                  ? 'bg-lime-600 hover:bg-lime-500 text-white font-semibold' 
-                  : 'border-slate-200 dark:border-slate-800'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5 mr-1" /> Via SMS / WhatsApp
-            </Button>
             <Button
               type="button"
               variant={channel === 'email' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setChannel('email')}
               className={`text-xs rounded-xl ${
-                channel === 'email' 
-                  ? 'bg-lime-600 hover:bg-lime-500 text-white font-semibold' 
-                  : 'border-slate-200 dark:border-slate-800'
+                channel === 'email'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white font-semibold'
+                  : 'border-white/15 bg-black/40 text-gray-300'
               }`}
             >
-              <Mail className="w-3.5 h-3.5 mr-1" /> Via Email
+              <Mail className="w-3.5 h-3.5 mr-1.5" /> Email OTP
+            </Button>
+            <Button
+              type="button"
+              variant={channel === 'phone' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setChannel('phone')}
+              className={`text-xs rounded-xl ${
+                channel === 'phone'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white font-semibold'
+                  : 'border-white/15 bg-black/40 text-gray-300'
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5 mr-1.5" /> Phone SMS
             </Button>
           </div>
 
-          <form onSubmit={handleVerify} className="space-y-6">
+          <div className="flex gap-2">
+            <Input
+              type={channel === 'email' ? 'email' : 'tel'}
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder={channel === 'email' ? 'name@company.com' : '+919876543210'}
+              className="h-10 bg-black/50 border-white/15 text-white text-xs rounded-xl"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={sending || resendTimer > 0}
+              onClick={handleSendOtp}
+              className="border-white/15 text-emerald-400 text-xs rounded-xl shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${sending ? 'animate-spin' : ''}`} />
+              {resendTimer > 0 ? `${resendTimer}s` : 'Send OTP'}
+            </Button>
+          </div>
+
+          <form onSubmit={handleVerify} className="space-y-4">
             <div className="flex justify-between gap-2" onPaste={handlePaste}>
               {otp.map((digit, idx) => (
-                <input
+                <Input
                   key={idx}
-                  ref={(el) => { inputRefs.current[idx] = el; }}
+                  ref={(el) => {
+                    inputRefs.current[idx] = el;
+                  }}
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
                   value={digit}
                   onChange={(e) => handleChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
-                  className="w-12 h-14 text-center text-xl font-extrabold rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:border-lime-600 focus:outline-none transition-colors"
+                  className="w-11 h-13 text-center text-lg font-bold bg-black/50 border-white/15 text-white rounded-xl focus:border-emerald-500"
                 />
               ))}
             </div>
@@ -156,36 +219,12 @@ export default function VerifyOTPPage() {
             <Button
               type="submit"
               disabled={loading || otp.join('').length !== 6}
-              className="w-full bg-lime-600 hover:bg-lime-500 text-white font-bold rounded-xl py-5 shadow-md shadow-lime-600/30 text-xs"
+              className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl"
             >
-              {loading ? 'Verifying OTP...' : 'Confirm & Continue'}
+              {loading ? 'Verifying...' : 'Verify OTP Code'}
             </Button>
           </form>
-
-          <div className="text-center text-xs text-slate-500 flex items-center justify-center gap-1">
-            <span>Didn't receive the code?</span>
-            {resendTimer > 0 ? (
-              <span className="font-semibold text-slate-700 dark:text-slate-300">Resend in {resendTimer}s</span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleResend}
-                className="font-bold text-lime-600 hover:underline inline-flex items-center gap-1"
-              >
-                <RefreshCw className="w-3 h-3" /> Resend OTP
-              </button>
-            )}
-          </div>
         </CardContent>
-
-        <CardFooter className="bg-slate-50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800/80 py-4 flex justify-center">
-          <Link
-            href="/login"
-            className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 inline-flex items-center gap-1"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Return to Sign In
-          </Link>
-        </CardFooter>
       </Card>
     </div>
   );

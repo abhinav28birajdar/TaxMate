@@ -2,30 +2,24 @@ import { NextRequest } from 'next/server';
 import { fail, ok } from '@/lib/backend/response';
 import { profileSchema } from '@/lib/backend/validation';
 import { requireAuth, supabaseAdmin } from '@/lib/backend/supabase';
+import { getProfile, updateProfile } from '@/lib/backend/profile-service';
 import { logActivity } from '@/lib/backend/audit';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
 
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, email, name, is_email_verified')
-      .eq('id', auth.userId)
-      .single();
+    const [{ data: user, error: userError }, profile] = await Promise.all([
+      supabaseAdmin
+        .from('users')
+        .select('id, email, name, avatar_url, email_verified, role, status')
+        .eq('id', auth.userId)
+        .maybeSingle(),
+      getProfile(auth.userId),
+    ]);
 
     if (userError) {
       throw userError;
-    }
-
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('user_id', auth.userId)
-      .single();
-
-    if (profileError) {
-      throw profileError;
     }
 
     return ok({ user, profile }, 'Profile fetched');
@@ -40,27 +34,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const parsed = profileSchema.parse(body);
 
-    if (parsed.fullName) {
-      await supabaseAdmin.from('users').update({ name: parsed.fullName }).eq('id', auth.userId);
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        bio: parsed.bio,
-        website: parsed.website,
-        twitter: parsed.twitter,
-        linkedin: parsed.linkedin,
-        github: parsed.github,
-        is_public: parsed.isPublic,
-      })
-      .eq('user_id', auth.userId)
-      .select('*')
-      .single();
-
-    if (error) {
-      throw error;
-    }
+    const profile = await updateProfile(auth.userId, parsed);
 
     await logActivity({
       userId: auth.userId,
@@ -69,7 +43,7 @@ export async function PATCH(request: NextRequest) {
       resourceId: auth.userId,
     });
 
-    return ok({ profile: data }, 'Profile updated');
+    return ok({ profile }, 'Profile updated');
   } catch (error) {
     return fail(error);
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createHash } from 'crypto';
+import { getServiceClient } from '@/lib/backend/supabase';
 import { verifyEmailSchema } from '@/lib/validators/auth';
 import { createAuditLog } from '@/lib/auth-service';
 
@@ -18,15 +19,15 @@ export async function POST(request: NextRequest) {
     }
 
     const { token } = validation.data;
-    const supabase = await createClient();
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const supabase = getServiceClient();
 
-    // Find verification token
     const { data: verificationData, error: verificationError } = await supabase
       .from('verification_tokens')
-      .select('user_id, expires_at, used')
-      .eq('token', token)
+      .select('id, user_id, expires_at, used')
+      .eq('token', tokenHash)
       .eq('type', 'EMAIL_VERIFICATION')
-      .single();
+      .maybeSingle();
 
     if (verificationError || !verificationData) {
       return NextResponse.json(
@@ -35,7 +36,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if token is expired
     if (new Date(verificationData.expires_at) < new Date()) {
       return NextResponse.json(
         { success: false, error: 'Token has expired' },
@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if token was already used
     if (verificationData.used) {
       return NextResponse.json(
         { success: false, error: 'Token has already been used' },
@@ -51,13 +50,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update user status
+    const now = new Date().toISOString();
     const { error: updateError } = await supabase
       .from('users')
       .update({
         status: 'ACTIVE',
         email_verified: true,
-        email_verified_at: new Date().toISOString(),
+        email_verified_at: now,
       })
       .eq('id', verificationData.user_id);
 
@@ -69,13 +68,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mark token as used
     await supabase
       .from('verification_tokens')
-      .update({ used: true, used_at: new Date().toISOString() })
-      .eq('token', token);
+      .update({ used: true, used_at: now })
+      .eq('id', verificationData.id);
 
-    // Create audit log
     await createAuditLog(
       verificationData.user_id,
       'EMAIL_VERIFIED',
@@ -83,18 +80,9 @@ export async function POST(request: NextRequest) {
       verificationData.user_id
     );
 
-    // Confirm email in Supabase Auth
-    const { data: user } = await supabase
-      .from('users')
-      .select('email')
-      .eq('id', verificationData.user_id)
-      .single();
-
-    if (user?.email) {
-      await supabase.auth.admin.updateUserById(verificationData.user_id, {
-        email_confirm: true,
-      });
-    }
+    await supabase.auth.admin.updateUserById(verificationData.user_id, {
+      email_confirm: true,
+    });
 
     return NextResponse.json(
       {

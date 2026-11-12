@@ -171,17 +171,6 @@ export class PaymentService {
         throw new Error(data.error || 'Failed to create payment order');
       }
 
-      // Save order to database
-      await this.supabase.from('payments').insert([
-        {
-          invoice_id: invoiceId,
-          amount,
-          currency: 'INR',
-          razorpay_order_id: data.id,
-          status: 'pending',
-        },
-      ]);
-
       return data;
     } catch (error) {
       console.error('Error creating payment order:', error);
@@ -208,6 +197,7 @@ export class PaymentService {
           razorpayOrderId,
           razorpayPaymentId,
           razorpaySignature,
+          invoiceId,
         }),
       });
 
@@ -217,25 +207,17 @@ export class PaymentService {
         throw new Error(data.error || 'Payment verification failed');
       }
 
-      // Update payment status
-      const { data: payment, error } = await this.supabase
-        .from('payments')
-        .update({
-          status: 'completed',
-          razorpay_payment_id: razorpayPaymentId,
-          paid_at: new Date().toISOString(),
-        })
-        .eq('razorpay_order_id', razorpayOrderId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Update invoice status
-      const invoice = await this.getInvoice(invoiceId);
-      await this.updateInvoiceStatus(invoiceId, 'paid', new Date().toISOString());
-
-      return payment;
+      return data.payment || ({
+        id: data.paymentId || razorpayPaymentId,
+        invoiceId,
+        amount: data.amount || 0,
+        currency: 'INR',
+        paymentMethod: 'razorpay',
+        razorpayPaymentId,
+        razoraypOrderId: razorpayOrderId,
+        status: 'completed',
+        paidAt: new Date().toISOString(),
+      } as Payment);
     } catch (error) {
       console.error('Error verifying payment:', error);
       throw error;
@@ -493,18 +475,6 @@ export class PaymentService {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create subscription');
       }
-
-      // Save subscription to database
-      await this.supabase.from('subscriptions').insert([
-        {
-          user_id: userId,
-          plan_type: planType,
-          billing_cycle: interval,
-          razorpay_subscription_id: data.id,
-          status: 'active',
-          starts_at: new Date().toISOString(),
-        },
-      ]);
 
       return data;
     } catch (error) {

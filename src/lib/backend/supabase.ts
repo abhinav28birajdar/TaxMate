@@ -6,6 +6,9 @@ import { verifyAccessToken, JWTPayload, extractBearerToken } from './jwt';
 let serviceClient: SupabaseClient | null = null;
 
 export function createServiceClient(): SupabaseClient {
+  if (typeof window !== 'undefined') {
+    throw new Error('Service role client cannot be initialized in the browser.');
+  }
   if (serviceClient) {
     return serviceClient;
   }

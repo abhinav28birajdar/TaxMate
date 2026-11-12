@@ -3,10 +3,12 @@ import { fail, ok } from '@/lib/backend/response';
 import { requireAuth, supabaseAdmin } from '@/lib/backend/supabase';
 import { ensureRole } from '@/lib/backend/rbac';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
-    ensureRole(auth.roles, ['admin', 'moderator']);
+    ensureRole(auth.roles, ['SUPER_ADMIN', 'ADMIN', 'STAFF']);
 
     const userId = request.nextUrl.searchParams.get('userId');
     let query = supabaseAdmin

@@ -56,14 +56,5 @@ export const PERMISSIONS = {
 } as const;
 
 export function hasPermission(userRole: string, permission: keyof typeof PERMISSIONS): boolean {
-    return (PERMISSIONS[permission] as readonly string[]).includes(userRole);
-}
-
-// React hook
-import { useAuth } from '@/hooks/UnifiedAuthContext';
-export function usePermission(permission: keyof typeof PERMISSIONS): boolean {
-    const { user } = useAuth();
-    const userRole = user?.role;
-    if (!userRole) return false;
-    return hasPermission(userRole, permission);
+    return (PERMISSIONS[permission] as readonly string[]).includes(userRole.toUpperCase());
 }

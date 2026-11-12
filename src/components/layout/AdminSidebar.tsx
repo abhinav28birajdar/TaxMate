@@ -18,8 +18,6 @@ import {
   Wrench,
   HelpCircle,
   FileText,
-  Layers,
-  Sparkles,
   Calendar,
   FolderLock,
   FileSpreadsheet
@@ -27,7 +25,6 @@ import {
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "All 47 Modules Hub", href: "/modules", icon: Layers, highlight: true },
   { name: "Dashboard", href: "/admin/dashboard", icon: Activity },
   { name: "Users Management", href: "/admin/users", icon: Users },
   { name: "Customers Hub", href: "/admin/customers", icon: Users },
@@ -77,8 +74,6 @@ export function AdminSidebar() {
                 className={cn(
                   isActive
                     ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold"
-                    : item.highlight
-                    ? "bg-white/5 text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20"
                     : "text-gray-400 hover:bg-white/5 hover:text-white",
                   "group flex items-center px-3 py-2 text-xs font-medium rounded-xl transition-all"
                 )}
@@ -91,9 +86,6 @@ export function AdminSidebar() {
                   aria-hidden="true"
                 />
                 <span className="truncate">{item.name}</span>
-                {item.highlight && (
-                  <Sparkles className="w-3 h-3 text-emerald-400 ml-auto shrink-0 animate-pulse" />
-                )}
               </Link>
             );
           })}

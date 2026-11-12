@@ -148,7 +148,7 @@ export class AnalyticsService {
       .from('ca_client_relationships')
       .select('*', { count: 'exact' })
       .eq('ca_id', caId)
-      .eq('status', 'accepted');
+      .in('status', ['active', 'accepted']);
 
     const activeCases = cases?.filter(c => c.status !== 'completed' && c.status !== 'cancelled').length || 0;
     const completedCases = cases?.filter(c => c.status === 'completed').length || 0;
@@ -174,7 +174,7 @@ export class AnalyticsService {
       .from('ca_client_relationships')
       .select('*', { count: 'exact' })
       .eq('client_id', clientId)
-      .eq('status', 'accepted');
+      .in('status', ['active', 'accepted']);
 
     const { data: cases } = await this.supabase
       .from('cases')
@@ -302,7 +302,7 @@ export class AnalyticsService {
       .from('ca_client_relationships')
       .select('connected_at')
       .eq('ca_id', caId)
-      .eq('status', 'accepted')
+      .in('status', ['active', 'accepted'])
       .gte('connected_at', startDate.toISOString());
 
     if (error) throw error;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, Phone, MapPin, ShieldCheck } from "lucide-react";
+import { Github, ShieldCheck } from "lucide-react";
 
 export function Footer() {
   return (
@@ -42,34 +42,24 @@ export function Footer() {
         </div>
 
         <div>
-          <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider mb-3">Support & Contact</h4>
-          <ul className="space-y-2 text-xs">
-            <li className="flex items-center gap-2">
-              <Mail className="w-3.5 h-3.5 text-lime-600 shrink-0" />
-              <a href="mailto:support@taxmate.app" className="hover:text-lime-600 dark:hover:text-lime-400 font-bold text-slate-900 dark:text-white">
-                support@taxmate.app
-              </a>
-            </li>
-            <li className="flex items-center gap-2">
-              <Phone className="w-3.5 h-3.5 text-lime-600 shrink-0" />
-              <span>+91 1800-TAX-MATE (Toll Free)</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <MapPin className="w-3.5 h-3.5 text-lime-600 shrink-0 mt-0.5" />
-              <span>Cyber City, Bandra Kurla Complex, Mumbai, MH 400051</span>
-            </li>
-          </ul>
+          <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider mb-3">Project</h4>
+          <a
+            href="https://github.com/abhinav28birajdar"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 text-xs hover:text-lime-600 dark:hover:text-lime-400"
+          >
+            <Github className="w-4 h-4" /> @abhinav28birajdar
+          </a>
         </div>
       </div>
 
       <div className="container mx-auto px-4 mt-8 pt-6 border-t border-slate-200 dark:border-slate-800/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
-        <div>
-          &copy; {new Date().getFullYear()} TaxMate SaaS Platform Inc. All rights reserved.
-        </div>
+        <div>&copy; {new Date().getFullYear()} TaxMate. Built by Abhinav.</div>
         <div className="flex gap-4">
           <Link href="/privacy-policy" className="hover:underline">Privacy</Link>
           <Link href="/terms-of-service" className="hover:underline">Terms</Link>
-          <Link href="/contact" className="hover:underline">Support</Link>
+          <Link href="/faq" className="hover:underline">FAQ</Link>
         </div>
       </div>
     </footer>

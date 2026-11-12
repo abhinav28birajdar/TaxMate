@@ -1,15 +1,28 @@
 /**
  * REAL-TIME SUBSCRIPTION SYSTEM
  * Handles all real-time updates using Supabase
- * 
+ *
  * Created: 2026-04-08
  */
 
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useId } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
+
+function getSafeSupabaseClient() {
+  try {
+    return createClient();
+  } catch {
+    return null;
+  }
+}
+
+function isInvalidFilter(filter?: string) {
+  if (!filter) return false;
+  return filter.endsWith('=') || filter.includes('=eq.undefined') || filter.includes('=eq.null');
+}
 
 /**
  * Generic hook for subscribing to database changes
@@ -20,17 +33,24 @@ export function useRealtimeSubscription<T>(
   onInsert?: (record: T) => void,
   onUpdate?: (record: T) => void,
   onDelete?: (record: T) => void,
-  _dependencies?: unknown[]
+  _dependencies?: unknown[],
+  enabled: boolean = true
 ) {
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const callbacksRef = useRef({ onInsert, onUpdate, onDelete });
   callbacksRef.current = { onInsert, onUpdate, onDelete };
 
   useEffect(() => {
-    const supabase = createClient();
-    const channelName = `realtime-${table}-${filter || 'all'}`;
+    if (!enabled || !table || isInvalidFilter(filter)) {
+      setIsSubscribed(false);
+      return;
+    }
 
-    // Create channel
+    const supabase = getSafeSupabaseClient();
+    if (!supabase) return;
+
+    const channelName = `realtime-${table}-${filter || 'all'}-${instanceId}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -70,15 +90,15 @@ export function useRealtimeSubscription<T>(
         }
       );
 
-    // Subscribe
     channel.subscribe((status) => {
       setIsSubscribed(status === 'SUBSCRIBED');
     });
 
     return () => {
+      setIsSubscribed(false);
       void supabase.removeChannel(channel);
     };
-  }, [table, filter]);
+  }, [table, filter, instanceId, enabled]);
 
   return isSubscribed;
 }
@@ -92,13 +112,17 @@ export function useRealtimeTasks(
   onTaskUpdated?: (task: any) => void,
   onTaskDeleted?: (task: any) => void
 ) {
+  const matchesUser = (record: any) =>
+    !userId || record?.ca_id === userId || record?.client_id === userId || record?.assigned_to === userId;
+
   return useRealtimeSubscription(
     'tasks',
-    `ca_id=eq.${userId},client_id=eq.${userId}`,
-    onTaskAdded,
-    onTaskUpdated,
-    onTaskDeleted,
-    [userId]
+    undefined,
+    (task) => { if (matchesUser(task)) onTaskAdded?.(task); },
+    (task) => { if (matchesUser(task)) onTaskUpdated?.(task); },
+    (task) => { if (matchesUser(task)) onTaskDeleted?.(task); },
+    [userId],
+    Boolean(userId)
   );
 }
 
@@ -113,11 +137,12 @@ export function useRealtimeMessages(
 ) {
   return useRealtimeSubscription(
     'messages',
-    `conversation_id=eq.${conversationId}`,
+    conversationId ? `conversation_id=eq.${conversationId}` : undefined,
     onMessageAdded,
     onMessageUpdated,
     onMessageDeleted,
-    [conversationId]
+    [conversationId],
+    Boolean(conversationId)
   );
 }
 
@@ -130,11 +155,12 @@ export function useRealtimeNotifications(
 ) {
   return useRealtimeSubscription(
     'notifications',
-    `user_id=eq.${userId}`,
+    userId ? `user_id=eq.${userId}` : undefined,
+    onNotification,
     onNotification,
     undefined,
-    undefined,
-    [userId]
+    [userId],
+    Boolean(userId)
   );
 }
 
@@ -146,13 +172,17 @@ export function useRealtimeAppointments(
   onAppointmentAdded?: (apt: any) => void,
   onAppointmentUpdated?: (apt: any) => void
 ) {
+  const matchesUser = (record: any) =>
+    !userId || record?.ca_id === userId || record?.client_id === userId || record?.created_by === userId;
+
   return useRealtimeSubscription(
     'appointments',
-    `ca_id=eq.${userId},client_id=eq.${userId}`,
-    onAppointmentAdded,
-    onAppointmentUpdated,
     undefined,
-    [userId]
+    (apt) => { if (matchesUser(apt)) onAppointmentAdded?.(apt); },
+    (apt) => { if (matchesUser(apt)) onAppointmentUpdated?.(apt); },
+    undefined,
+    [userId],
+    Boolean(userId)
   );
 }
 
@@ -165,13 +195,17 @@ export function useRealtimeInvoices(
   onInvoiceUpdated?: (inv: any) => void,
   onInvoiceDeleted?: (inv: any) => void
 ) {
+  const matchesUser = (record: any) =>
+    !userId || record?.ca_id === userId || record?.client_id === userId;
+
   return useRealtimeSubscription(
     'invoices',
-    `ca_id=eq.${userId},client_id=eq.${userId}`,
-    onInvoiceAdded,
-    onInvoiceUpdated,
-    onInvoiceDeleted,
-    [userId]
+    undefined,
+    (inv) => { if (matchesUser(inv)) onInvoiceAdded?.(inv); },
+    (inv) => { if (matchesUser(inv)) onInvoiceUpdated?.(inv); },
+    (inv) => { if (matchesUser(inv)) onInvoiceDeleted?.(inv); },
+    [userId],
+    Boolean(userId)
   );
 }
 
@@ -186,7 +220,10 @@ export function useRealtimePresence(
   const presenceRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
+    if (!userId || !userRole) return;
+    const supabase = getSafeSupabaseClient();
+    if (!supabase) return;
+
     const presenceChannel = supabase.channel(`presence:${userRole}`, {
       config: {
         broadcast: { self: true },
@@ -202,13 +239,13 @@ export function useRealtimePresence(
           .filter((user: any) => user.user_id !== userId);
         setOnlineUsers(users);
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+      .on('presence', { event: 'join' }, ({ newPresences }) => {
         setOnlineUsers((prev) => [
           ...prev,
           ...newPresences.filter((p: any) => p.user_id !== userId),
         ]);
       })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
         setOnlineUsers((prev) =>
           prev.filter(
             (p: any) => !leftPresences.some((l: any) => l.user_id === p.user_id)
@@ -230,7 +267,7 @@ export function useRealtimePresence(
 
     return () => {
       if (presenceRef.current) {
-        supabase.removeChannel(presenceRef.current);
+        void supabase.removeChannel(presenceRef.current);
       }
     };
   }, [userId, userRole]);
@@ -250,6 +287,7 @@ export function useTypingIndicator(
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const setTyping = useCallback((isTyping: boolean) => {
+    if (!conversationId || !userId) return;
     if (typingRef.current) {
       typingRef.current.send({
         type: 'broadcast',
@@ -264,12 +302,15 @@ export function useTypingIndicator(
       }
       typingTimeoutRef.current = setTimeout(() => {
         setTyping(false);
-      }, 3000); // Auto-stop after 3 seconds
+      }, 3000);
     }
   }, [conversationId, userId]);
 
   useEffect(() => {
-    const supabase = createClient();
+    if (!conversationId) return;
+    const supabase = getSafeSupabaseClient();
+    if (!supabase) return;
+
     const channel = supabase.channel(`typing:${conversationId}`);
 
     channel
@@ -290,7 +331,7 @@ export function useTypingIndicator(
 
     return () => {
       if (typingRef.current) {
-        supabase.removeChannel(typingRef.current);
+        void supabase.removeChannel(typingRef.current);
       }
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -313,6 +354,7 @@ export function useCollaboration(
 
   const updateCursorPosition = useCallback(
     (line: number, column: number) => {
+      if (!documentId || !userId) return;
       if (collabRef.current) {
         collabRef.current.send({
           type: 'broadcast',
@@ -321,11 +363,14 @@ export function useCollaboration(
         });
       }
     },
-    [userId]
+    [documentId, userId]
   );
 
   useEffect(() => {
-    const supabase = createClient();
+    if (!documentId) return;
+    const supabase = getSafeSupabaseClient();
+    if (!supabase) return;
+
     const channel = supabase.channel(`collab:${documentId}`);
 
     channel
@@ -348,7 +393,7 @@ export function useCollaboration(
 
     return () => {
       if (collabRef.current) {
-        supabase.removeChannel(collabRef.current);
+        void supabase.removeChannel(collabRef.current);
       }
     };
   }, [documentId]);
@@ -366,40 +411,75 @@ export function useMultipleRealtimeSubscriptions(
     onInsert?: (record: any) => void;
     onUpdate?: (record: any) => void;
     onDelete?: (record: any) => void;
-  }>
+  }>,
+  enabled: boolean = true
 ) {
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const subsRef = useRef(subscriptions);
+  subsRef.current = subscriptions;
+
+  const signature = subscriptions
+    .map((s) => `${s.table}:${s.filter || ''}`)
+    .join('|');
 
   useEffect(() => {
-    if (!subscriptions || subscriptions.length === 0) return;
-    const supabase = createClient();
-    const channels = subscriptions.map((sub) => {
-      return supabase
-        .channel(`multi-${sub.table}-${sub.filter || 'all'}-${Math.random()}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: sub.table, ...(sub.filter && { filter: sub.filter }) },
-          (payload) => sub.onInsert?.(payload.new)
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: sub.table, ...(sub.filter && { filter: sub.filter }) },
-          (payload) => sub.onUpdate?.(payload.new)
-        )
-        .on(
-          'postgres_changes',
-          { event: 'DELETE', schema: 'public', table: sub.table, ...(sub.filter && { filter: sub.filter }) },
-          (payload) => sub.onDelete?.(payload.old)
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') setIsSubscribed(true);
-        });
-    });
+    const currentSubs = subsRef.current;
+    if (!enabled || !currentSubs || currentSubs.length === 0) {
+      setIsSubscribed(false);
+      return;
+    }
+
+    const supabase = getSafeSupabaseClient();
+    if (!supabase) return;
+
+    const channels = currentSubs
+      .filter((sub) => sub.table && !isInvalidFilter(sub.filter))
+      .map((sub, index) => {
+        return supabase
+          .channel(`multi-${sub.table}-${sub.filter || 'all'}-${instanceId}-${index}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: sub.table,
+              ...(sub.filter && { filter: sub.filter }),
+            },
+            (payload) => subsRef.current[index]?.onInsert?.(payload.new)
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: sub.table,
+              ...(sub.filter && { filter: sub.filter }),
+            },
+            (payload) => subsRef.current[index]?.onUpdate?.(payload.new)
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'DELETE',
+              schema: 'public',
+              table: sub.table,
+              ...(sub.filter && { filter: sub.filter }),
+            },
+            (payload) => subsRef.current[index]?.onDelete?.(payload.old)
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') setIsSubscribed(true);
+          });
+      });
 
     return () => {
-      channels.forEach((ch) => supabase.removeChannel(ch));
+      setIsSubscribed(false);
+      channels.forEach((ch) => {
+        void supabase.removeChannel(ch);
+      });
     };
-  }, [JSON.stringify(subscriptions.map(s => `${s.table}:${s.filter}`))]);
+  }, [signature, instanceId, enabled]);
 
   return isSubscribed;
 }

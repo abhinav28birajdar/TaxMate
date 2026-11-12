@@ -9,6 +9,8 @@ import { validateInput, RequestSchemas } from '@/lib/api/validation';
 import { createInvoiceRecord } from '@/lib/api/db-operations';
 import { ApiError, HTTP_STATUS } from '@/lib/api/response';
 
+import { getResolvedClientIdsForUser } from '@/lib/api/server-auth';
+
 export async function POST(request: NextRequest) {
   return handleApiRequest(
     request,
@@ -17,7 +19,7 @@ export async function POST(request: NextRequest) {
       if (!checkRateLimit(user.sub, 50, 60000)) {
         throw new ApiError('Rate limit exceeded', {
           code: 'RATE_LIMIT',
-          statusCode: HTTP_STATUS.INTERNAL_ERROR,
+          statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
         });
       }
 
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
     {
       method: 'POST',
       requireAuth: true,
-      allowedRoles: ['CA', 'SUPER_ADMIN'],
+      allowedRoles: ['CA', 'STAFF', 'ADMIN', 'SUPER_ADMIN'],
     }
   );
 }
@@ -70,17 +72,21 @@ export async function GET(request: NextRequest) {
     request,
     async (req, user) => {
       const { searchParams } = new URL(req.url);
-      const page = parseInt(searchParams.get('page') || '1');
-      const limit = parseInt(searchParams.get('limit') || '20');
+      const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20') || 20));
       const status = searchParams.get('status');
 
-      const { createClient } = await import('@/utils/supabase/server');
-      const supabase = await createClient();
+      const { getServiceClient } = await import('@/lib/backend/supabase');
+      const supabase = getServiceClient();
 
       let query = supabase
         .from('invoices')
-        .select('*', { count: 'exact' })
-        .or(`ca_id.eq.${user.sub},client_id.eq.${user.sub}`);
+        .select('*', { count: 'exact' });
+
+      if (!['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+        const clientIds = await getResolvedClientIdsForUser(user.sub);
+        query = query.or(`ca_id.eq.${user.sub},created_by.eq.${user.sub},client_id.in.(${clientIds.join(',')})`);
+      }
 
       if (status) {
         query = query.eq('status', status.toUpperCase());
@@ -92,6 +98,19 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
+      let paymentsQuery = supabase
+        .from('payments')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (!['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+        const clientIds = await getResolvedClientIdsForUser(user.sub);
+        paymentsQuery = paymentsQuery.or(`ca_id.eq.${user.sub},client_id.in.(${clientIds.join(',')})`);
+      }
+
+      const { data: paymentRows } = await paymentsQuery;
+
       const invoices = (data || []).map((item) => ({
         id: item.id,
         caId: item.ca_id,
@@ -99,6 +118,8 @@ export async function GET(request: NextRequest) {
         invoiceNumber: item.invoice_number,
         description: item.description,
         amount: item.amount,
+        totalAmount: item.total_amount ?? item.amount,
+        taxAmount: item.tax_amount ?? item.metadata?.taxAmount ?? 0,
         status: item.status,
         dueDate: item.due_date,
         paidAt: item.paid_at,
@@ -108,8 +129,28 @@ export async function GET(request: NextRequest) {
         updatedAt: item.updated_at,
       }));
 
+      const payments = (paymentRows || []).map((p: any) => ({
+        id: p.id,
+        invoiceId: p.invoice_id,
+        caId: p.ca_id,
+        clientId: p.client_id,
+        amount: Number(p.amount || 0),
+        currency: p.currency || 'INR',
+        status: p.status,
+        gateway: p.gateway,
+        orderId: p.razorpay_order_id || p.gateway_order_id,
+        paymentId: p.razorpay_payment_id || p.gateway_payment_id || p.gateway_transaction_id,
+        paymentMethod: p.payment_method,
+        notes: p.notes,
+        metadata: p.metadata,
+        paidAt: p.paid_at,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      }));
+
       return {
         invoices,
+        payments,
         pagination: {
           page,
           limit,

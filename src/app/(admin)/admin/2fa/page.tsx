@@ -1,107 +1,135 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ShieldCheck, KeyRound, QrCode, Smartphone, ArrowRight, CheckCircle2, Copy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ShieldCheck, KeyRound, Loader2, QrCode, ArrowLeft } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
+import { toast } from 'sonner';
 
 export default function Admin2FAPage() {
   const router = useRouter();
-  const [token, setToken] = useState("");
-  const [loading, setLoading] = useState(false);
-  const secretKey = "JBSWY3DPEHPK3PXP";
+  const { enableTwoFactor, verifyTwoFactor } = useAuth();
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [loadingSetup, setLoadingSetup] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (token.length !== 6) {
-      toast.error("Please enter a valid 6-digit code");
-      return;
+  const handleInitSetup = async () => {
+    setLoadingSetup(true);
+    try {
+      const result = await enableTwoFactor();
+      setQrUrl(result.qrCode || null);
+      setSecret(result.secret || null);
+      toast.success('2FA secret generated. Scan with your authenticator app.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to initialize 2FA');
+    } finally {
+      setLoadingSetup(false);
     }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("Admin Hardware 2FA token verified and bound to root profile!");
-      router.push("/admin/dashboard");
-    }, 1000);
   };
 
-  const copySecret = () => {
-    navigator.clipboard.writeText(secretKey);
-    toast.success("Secret key copied to clipboard");
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim() || code.trim().length < 6) {
+      toast.error('Enter the 6-digit authenticator code.');
+      return;
+    }
+    setVerifying(true);
+    try {
+      await verifyTwoFactor(code.trim());
+      toast.success('Admin 2FA verified and enforced!');
+      router.push('/admin/dashboard');
+    } catch (err: any) {
+      toast.error(err?.message || 'Verification failed');
+    } finally {
+      setVerifying(false);
+    }
   };
 
   return (
-    <div className="space-y-6 w-full max-w-md mx-auto py-8">
-      <div className="space-y-2 text-center lg:text-left">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold uppercase tracking-wider">
-          <ShieldCheck className="w-3.5 h-3.5" /> Mandatory Multi-Factor Auth
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">
-          Admin 2FA Authorization
-        </h1>
-        <p className="text-sm text-slate-400">
-          Super Admin accounts require TOTP (Google Authenticator / YubiKey) verification for root clearance.
-        </p>
-      </div>
+    <div className="p-6 max-w-xl mx-auto space-y-6">
+      <Button variant="ghost" size="sm" onClick={() => router.back()} className="text-slate-400">
+        <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
+      </Button>
 
-      <div className="bg-[#111111] p-6 sm:p-8 rounded-3xl border border-white/10 shadow-2xl space-y-6">
-        <div className="p-4 rounded-2xl bg-[#161616] border border-white/5 text-center space-y-3">
-          <div className="w-32 h-32 bg-white rounded-xl mx-auto p-2 flex items-center justify-center">
-            {/* Visual QR placeholder */}
-            <div className="w-full h-full border-2 border-dashed border-gray-400 rounded flex flex-col items-center justify-center text-gray-800">
-              <QrCode className="w-12 h-12 text-black" />
-              <span className="text-[9px] font-mono font-bold mt-1 text-black">ADMIN-AUTH-KEY</span>
-            </div>
+      <Card className="bg-slate-900 border-slate-800 p-6 sm:p-8 space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-lime-600/15 border border-lime-500/30 flex items-center justify-center text-lime-400">
+            <ShieldCheck className="w-6 h-6" />
           </div>
-          <div className="flex items-center justify-center gap-2">
-            <code className="text-xs font-mono text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20">
-              {secretKey}
-            </code>
-            <Button size="sm" variant="ghost" onClick={copySecret} className="h-7 px-2 text-gray-400 hover:text-white">
-              <Copy className="w-3.5 h-3.5" />
-            </Button>
+          <div>
+            <h1 className="text-xl font-bold text-slate-100">Admin Two-Factor Security</h1>
+            <p className="text-xs text-slate-400">Enroll or verify TOTP authenticator protection for your admin account</p>
           </div>
-          <p className="text-[11px] text-gray-400">Scan QR code using Google Authenticator, 1Password, or YubiKey Authenticator</p>
         </div>
+
+        {!secret && !qrUrl ? (
+          <Button
+            onClick={handleInitSetup}
+            disabled={loadingSetup}
+            variant="outline"
+            className="w-full border-slate-700 text-slate-200 hover:bg-slate-800"
+          >
+            {loadingSetup ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating TOTP Secret...
+              </>
+            ) : (
+              <>
+                <QrCode className="w-4 h-4 mr-2 text-lime-400" /> Generate New Authenticator Secret
+              </>
+            )}
+          </Button>
+        ) : (
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 text-center">
+            {qrUrl && (
+              <img src={qrUrl} alt="Authenticator QR Code" className="w-40 h-40 mx-auto rounded-xl bg-white p-2" />
+            )}
+            {secret && (
+              <div className="text-xs text-slate-400">
+                Manual Key: <code className="text-lime-400 font-mono font-bold select-all">{secret}</code>
+              </div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleVerify} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-              <Smartphone className="w-3.5 h-3.5 text-rose-400" /> Enter 6-Digit TOTP Code
-            </label>
-            <Input
-              type="text"
-              placeholder="000000"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              className="bg-black/50 border-white/10 text-white rounded-xl focus:border-rose-500 text-center tracking-widest text-lg font-mono"
-              maxLength={6}
-              required
-            />
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">6-Digit TOTP Verification Code</label>
+            <div className="relative">
+              <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                required
+                placeholder="000000"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="pl-10 bg-slate-950 border-slate-800 text-slate-100 font-mono tracking-widest"
+              />
+            </div>
           </div>
 
           <Button
             type="submit"
-            disabled={loading}
-            className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-2.5 rounded-xl shadow-[0_0_20px_rgba(225,29,72,0.4)] text-xs mt-2"
+            disabled={verifying}
+            className="w-full bg-lime-600 hover:bg-lime-500 text-slate-950 font-bold"
           >
-            {loading ? "Authenticating Clearance..." : "Confirm & Enter Super Admin"}
-            <ArrowRight className="w-4 h-4 ml-1.5" />
+            {verifying ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying Code...
+              </>
+            ) : (
+              'Verify & Enable 2FA'
+            )}
           </Button>
         </form>
-
-        <div className="pt-4 border-t border-white/10 flex items-center justify-between text-xs text-gray-400">
-          <Link href="/admin/login" className="hover:text-white transition-colors">
-            ← Back to Admin Login
-          </Link>
-          <Link href="/admin/dashboard" className="hover:text-white transition-colors">
-            Super Admin Home →
-          </Link>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }

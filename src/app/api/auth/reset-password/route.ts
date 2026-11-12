@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createHash } from 'crypto';
+import { getServiceClient } from '@/lib/backend/supabase';
 import { resetPasswordSchema } from '@/lib/validators/auth';
 import { hashPassword, createAuditLog } from '@/lib/auth-service';
 
@@ -22,15 +23,15 @@ export async function POST(request: NextRequest) {
     }
 
     const { token, password } = validation.data;
-    const supabase = await createClient();
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const supabase = getServiceClient();
 
-    // Find reset token
     const { data: tokenData, error: tokenError } = await supabase
       .from('verification_tokens')
-      .select('identifier, expires_at, used')
-      .eq('token', token)
-      .eq('type', 'PASSWORD_RESET')
-      .single();
+      .select('id, user_id, expires_at, used')
+      .eq('token', tokenHash)
+      .in('type', ['PASSWORD_RESET', 'password_reset'])
+      .maybeSingle();
 
     if (tokenError || !tokenData) {
       return NextResponse.json(
@@ -39,7 +40,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if token is expired
     if (new Date(tokenData.expires_at) < new Date()) {
       return NextResponse.json(
         { success: false, error: 'Token has expired' },
@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if token was already used
     if (tokenData.used) {
       return NextResponse.json(
         { success: false, error: 'Token has already been used' },
@@ -55,16 +54,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash new password
     const passwordHash = await hashPassword(password);
+    const now = new Date().toISOString();
 
-    // Update user password
     const { error: updateError } = await supabase
       .from('users')
       .update({
-        passwordHash: passwordHash,
+        password_hash: passwordHash,
+        updated_at: now,
       })
-      .eq('id', tokenData.identifier);
+      .eq('id', tokenData.user_id);
 
     if (updateError) {
       return NextResponse.json(
@@ -73,27 +72,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mark token as used
     await supabase
       .from('verification_tokens')
-      .update({ used: true, usedAt: new Date().toISOString() })
-      .eq('token', token);
+      .update({ used: true, used_at: now })
+      .eq('id', tokenData.id);
 
-    // Update password in Supabase Auth if exists
-    const { data: user } = await supabase
-      .from('users')
-      .select('email')
-      .eq('id', tokenData.identifier)
-      .single();
+    await supabase.auth.admin.updateUserById(tokenData.user_id, {
+      password,
+    });
 
-    if (user?.email) {
-      await supabase.auth.admin.updateUserById(tokenData.identifier, {
-        password: password,
-      });
-    }
-
-    // Create audit log
-    await createAuditLog(tokenData.identifier, 'PASSWORD_RESET', 'USER', tokenData.identifier);
+    await createAuditLog(tokenData.user_id, 'PASSWORD_RESET', 'USER', tokenData.user_id);
 
     return NextResponse.json(
       {

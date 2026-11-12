@@ -1,95 +1,113 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { 
-  Search, 
-  MapPin, 
-  Star, 
-  Award, 
-  ShieldCheck, 
-  Calendar, 
-  ArrowRight, 
-  Filter, 
-  Briefcase, 
-  CheckCircle2, 
-  Sparkles,
-  Users
+import {
+  Search,
+  MapPin,
+  Star,
+  ShieldCheck,
+  Loader2,
+  RefreshCw,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+interface PublicCA {
+  id: string;
+  slug: string;
+  name: string;
+  designation: string;
+  firm: string;
+  location: string;
+  city: string;
+  state: string;
+  experienceYears: number;
+  rating: number;
+  reviewsCount: number;
+  consultationFee: number;
+  avatarUrl: string | null;
+  specializations: string[];
+  verified: boolean;
+}
+
+function getInitials(name: string) {
+  return name
+    .replace(/^CA\s+/i, "")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
+}
 
 export default function FindCAPage() {
   const [search, setSearch] = useState("");
   const [selectedCity, setSelectedCity] = useState("all");
   const [selectedSpec, setSelectedSpec] = useState("all");
+  const [cas, setCas] = useState<PublicCA[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const cas = [
-    {
-      username: "rajesh-sharma-ca",
-      name: "CA Rajesh Sharma, FCA",
-      title: "Senior Tax Advisor & Statutory Auditor",
-      firm: "Sharma & Associates Chartered Accountants",
-      location: "New Delhi",
-      experience: "14+ Years",
-      rating: 4.9,
-      reviews: 142,
-      fee: "₹1,500",
-      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
-      specialization: "Corporate Tax & Sec 115BAC",
-      tags: ["Corporate Tax", "Statutory Audit", "GST Litigation"]
-    },
-    {
-      username: "ananya-deshmukh-ca",
-      name: "CA Ananya Deshmukh",
-      title: "GST Specialist & Indirect Tax Counsel",
-      firm: "Deshmukh Tax Consultants",
-      location: "Mumbai",
-      experience: "9+ Years",
-      rating: 4.8,
-      reviews: 98,
-      fee: "₹2,000",
-      avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&h=200&fit=crop",
-      specialization: "GST Audit & ITC Optimization",
-      tags: ["GSTR-9/9C", "Export LUT", "ITC Reconciliations"]
-    },
-    {
-      username: "vikramaditya-rao-ca",
-      name: "CA Vikramaditya Rao, FCA",
-      title: "Cross-Border Tax & Startup Due Diligence",
-      firm: "Rao & Partners Advisory LLP",
-      location: "Bengaluru",
-      experience: "16+ Years",
-      rating: 4.95,
-      reviews: 210,
-      fee: "₹2,500",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-      specialization: "NRI & Section 148A Appeals",
-      tags: ["DTAA Relief", "Schedule FA", "Angel Tax (Sec 56)"]
-    },
-    {
-      username: "priya-mehta-ca",
-      name: "CA Priya Mehta",
-      title: "Transfer Pricing & MSME Compliance",
-      firm: "Mehta & Co.",
-      location: "Pune",
-      experience: "11+ Years",
-      rating: 4.85,
-      reviews: 84,
-      fee: "₹1,800",
-      avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop",
-      specialization: "Transfer Pricing & 44AD",
-      tags: ["Form 3CEB", "Presumptive Tax", "MSME Subsidies"]
+  const loadCAs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/cas?limit=50");
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Unable to load Chartered Accountants directory.");
+      }
+      setCas(Array.isArray(json.cas) ? json.cas : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load CA directory.");
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const filtered = cas.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-                          c.specialization.toLowerCase().includes(search.toLowerCase()) ||
-                          c.location.toLowerCase().includes(search.toLowerCase());
-    const matchesCity = selectedCity === "all" || c.location.toLowerCase() === selectedCity.toLowerCase();
-    const matchesSpec = selectedSpec === "all" || c.specialization.toLowerCase().includes(selectedSpec.toLowerCase());
-    return matchesSearch && matchesCity && matchesSpec;
-  });
+  useEffect(() => {
+    loadCAs();
+  }, []);
+
+  const cities = useMemo(() => {
+    const unique = new Set<string>();
+    for (const ca of cas) {
+      const city = ca.city || ca.location;
+      if (city && city !== "India") unique.add(city);
+    }
+    return Array.from(unique).sort();
+  }, [cas]);
+
+  const specs = useMemo(() => {
+    const unique = new Set<string>();
+    for (const ca of cas) {
+      for (const s of ca.specializations || []) {
+        if (s) unique.add(s);
+      }
+    }
+    return Array.from(unique).sort();
+  }, [cas]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return cas.filter((c) => {
+      const matchesSearch =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        c.firm.toLowerCase().includes(q) ||
+        c.location.toLowerCase().includes(q) ||
+        (c.specializations || []).some((s) => s.toLowerCase().includes(q));
+      const matchesCity =
+        selectedCity === "all" ||
+        (c.city || "").toLowerCase() === selectedCity.toLowerCase() ||
+        c.location.toLowerCase().includes(selectedCity.toLowerCase());
+      const matchesSpec =
+        selectedSpec === "all" ||
+        (c.specializations || []).some((s) => s.toLowerCase().includes(selectedSpec.toLowerCase()));
+      return matchesSearch && matchesCity && matchesSpec;
+    });
+  }, [cas, search, selectedCity, selectedSpec]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
@@ -97,130 +115,186 @@ export default function FindCAPage() {
       <div className="absolute top-0 left-1/3 w-[500px] h-[350px] bg-emerald-600/10 rounded-full blur-[140px] pointer-events-none -z-10" />
 
       <div className="max-w-6xl mx-auto space-y-12 relative z-10">
-        
-        {/* Header */}
         <div className="text-center space-y-4 max-w-2xl mx-auto">
           <div className="inline-flex items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-xs font-semibold text-emerald-400">
-            <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> 100% ICAI Verified Practitioners
+            <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> ICAI Verified Practitioners
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
-            Find & Hire a Chartered Accountant.
+            Find &amp; Hire a Chartered Accountant.
           </h1>
           <p className="text-base text-gray-400 font-light">
-            Search top-tier tax practitioners by city, specialization, and verified client ratings across India.
+            Search verified tax practitioners across India by city, specialization, and live client ratings.
           </p>
         </div>
 
-        {/* Search & Filter Bar */}
         <div className="bg-[#111111] p-4 rounded-3xl border border-white/10 shadow-2xl flex flex-col md:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-500" />
             <input
               type="text"
-              placeholder="Search by CA name, city, or specialization (e.g. GST, Transfer Pricing)..."
+              placeholder="Search by CA name, firm, city, or specialization (e.g. GST, Income Tax)..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#181818] border border-white/5 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#181818] border border-white/10 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <select
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
-              className="bg-[#181818] border border-white/5 text-gray-300 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500"
+              aria-label="Filter by city"
+              className="bg-[#181818] border border-white/10 text-gray-300 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500"
             >
               <option value="all">All Cities</option>
-              <option value="New Delhi">New Delhi</option>
-              <option value="Mumbai">Mumbai</option>
-              <option value="Bengaluru">Bengaluru</option>
-              <option value="Pune">Pune</option>
+              {cities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
             </select>
 
             <select
               value={selectedSpec}
               onChange={(e) => setSelectedSpec(e.target.value)}
-              className="bg-[#181818] border border-white/5 text-gray-300 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500"
+              aria-label="Filter by practice area"
+              className="bg-[#181818] border border-white/10 text-gray-300 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500"
             >
               <option value="all">All Practice Areas</option>
-              <option value="Corporate">Corporate Tax</option>
-              <option value="GST">GST & Indirect Tax</option>
-              <option value="NRI">NRI & Foreign Asset</option>
+              {specs.map((spec) => (
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
+              ))}
             </select>
           </div>
         </div>
 
-        {/* CA Cards Directory */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filtered.map((ca, idx) => (
-            <div
-              key={idx}
-              className="bg-[#111111] border border-white/10 hover:border-emerald-500/40 rounded-3xl p-6 sm:p-7 flex flex-col justify-between space-y-6 shadow-2xl transition-all group"
-            >
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="relative shrink-0">
-                    <img 
-                      src={ca.avatar} 
-                      alt={ca.name}
-                      className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500/40 shadow-md"
-                    />
-                    <span className="absolute -bottom-1 -right-1 bg-emerald-600 text-white p-0.5 rounded-full text-[8px] font-bold">
-                      ✓
-                    </span>
-                  </div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400">
+            <Loader2 className="w-7 h-7 animate-spin text-emerald-400" />
+            <p className="text-xs">Loading verified Chartered Accountants...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-[#111111] border border-red-500/30 rounded-3xl p-8 text-center space-y-4 max-w-lg mx-auto">
+            <p className="text-sm text-red-300">{error}</p>
+            <Button onClick={loadCAs} variant="outline" size="sm" className="border-white/10 text-white rounded-xl">
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Retry
+            </Button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-[#111111] border border-white/10 rounded-3xl p-10 text-center space-y-4">
+            <Users className="w-10 h-10 text-emerald-400 mx-auto opacity-80" />
+            <h2 className="text-lg font-bold text-white">No matching Chartered Accountants found</h2>
+            <p className="text-xs text-gray-400 max-w-md mx-auto">
+              Try clearing your filters or sign up as a practicing CA to appear in the verified TaxMate directory.
+            </p>
+            {(search || selectedCity !== "all" || selectedSpec !== "all") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearch("");
+                  setSelectedCity("all");
+                  setSelectedSpec("all");
+                }}
+                className="border-white/10 text-gray-200 rounded-xl"
+              >
+                Reset Filters
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filtered.map((ca) => (
+              <div
+                key={ca.id}
+                className="bg-[#111111] border border-white/10 hover:border-emerald-500/40 rounded-3xl p-6 sm:p-7 flex flex-col justify-between space-y-6 shadow-2xl transition-all group"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="relative shrink-0">
+                      {ca.avatarUrl ? (
+                        <img
+                          src={ca.avatarUrl}
+                          alt={ca.name}
+                          className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500/40 shadow-md"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-300 font-bold text-lg">
+                          {getInitials(ca.name)}
+                        </div>
+                      )}
+                      {ca.verified && (
+                        <span className="absolute -bottom-1 -right-1 bg-emerald-600 text-white px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+                          ✓
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="space-y-1">
                       <h3 className="font-bold text-base text-white group-hover:text-emerald-400 transition-colors">
                         {ca.name}
                       </h3>
+                      <p className="text-xs text-gray-400">{ca.designation}</p>
+                      <p className="text-xs text-gray-400">{ca.firm}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 pt-0.5">
+                        <span className="flex items-center gap-1 text-gray-300">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-400" /> {ca.location}
+                        </span>
+                        <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                          <Star className="w-3.5 h-3.5 fill-emerald-500" />{" "}
+                          {ca.rating > 0 ? ca.rating.toFixed(1) : "New"} ({ca.reviewsCount})
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-400">{ca.title}</p>
-                    <p className="text-xs text-gray-400">{ca.firm}</p>
-                    <div className="flex items-center gap-3 text-xs text-gray-400 pt-0.5">
-                      <span className="flex items-center gap-1 text-gray-300">
-                        <MapPin className="w-3.5 h-3.5 text-emerald-400" /> {ca.location}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {(ca.specializations || []).slice(0, 4).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-[11px] text-gray-300 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-lg"
+                      >
+                        {tag}
                       </span>
-                      <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                        <Star className="w-3.5 h-3.5 fill-emerald-500" /> {ca.rating} ({ca.reviews})
-                      </span>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {ca.tags.map((tag, i) => (
-                    <span key={i} className="text-[11px] text-gray-300 bg-white/5 border border-white/5 px-2.5 py-0.5 rounded-lg">
-                      {tag}
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] text-gray-400 block">Consultation Fee</span>
+                    <span className="text-base font-bold text-emerald-400 font-mono">
+                      ₹{Number(ca.consultationFee || 0).toLocaleString("en-IN")}{" "}
+                      <span className="text-[10px] text-gray-400 font-normal">/ session</span>
                     </span>
-                  ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Link href={`/ca/${ca.slug || ca.id}`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-white/10 text-gray-300 hover:bg-white/5 text-xs rounded-xl"
+                      >
+                        View Profile
+                      </Button>
+                    </Link>
+                    <Link href={`/client/hire/${ca.id}`}>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-[0_0_15px_rgba(5,150,105,0.3)]"
+                      >
+                        Hire / Book
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </div>
-
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-gray-400 block">Consultation Fee</span>
-                  <span className="text-base font-bold text-emerald-400 font-mono">{ca.fee} <span className="text-[10px] text-gray-400 font-normal">/ 45m</span></span>
-                </div>
-
-                <div className="flex gap-2">
-                  <Link href={`/ca/${ca.username}`}>
-                    <Button variant="outline" size="sm" className="border-white/10 text-gray-300 hover:bg-white/5 text-xs rounded-xl">
-                      View Profile
-                    </Button>
-                  </Link>
-                  <Link href={`/client/meetings?ca=${ca.username}`}>
-                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-[0_0_15px_rgba(5,150,105,0.3)]">
-                      Book Session
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -50,12 +50,12 @@ export const ValidatedSchemas = {
 /**
  * Sanitize string input to prevent XSS
  */
-export function sanitizeString(input: string): string {
+export function sanitizeString(input: string, maxLength = 5000): string {
   return input
     .trim()
     .replace(/[<>]/g, '') // Remove HTML-like characters
     .replace(/javascript:/gi, '') // Remove javascript protocol
-    .substring(0, 1000); // Limit length
+    .substring(0, maxLength); // Limit length
 }
 
 /**
@@ -149,12 +149,15 @@ export const RequestSchemas = {
 
   // Cases
   createCase: z.object({
-    title: ValidatedSchemas.caseTitle,
-    description: ValidatedSchemas.description,
-    clientId: ValidatedSchemas.uuid,
+    title: z.string().trim().min(3, 'Case title must be at least 3 characters').max(200),
+    description: z.string().max(5000).optional().default(''),
+    clientId: ValidatedSchemas.uuid.optional().nullable(),
+    clientName: z.string().trim().max(200).optional(),
+    caseType: z.string().trim().max(100).optional(),
+    tags: z.array(z.string().trim().max(40)).optional(),
     assignedCaId: ValidatedSchemas.uuid.optional(),
-    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
-    deadline: z.string().datetime().optional(),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().default('MEDIUM'),
+    deadline: z.string().optional().nullable(),
   }),
 
   updateCase: z.object({
@@ -175,12 +178,15 @@ export const RequestSchemas = {
 
   // Appointments
   createAppointment: z.object({
-    clientId: ValidatedSchemas.uuid,
+    clientId: ValidatedSchemas.uuid.optional(),
+    caId: ValidatedSchemas.uuid.optional(),
     title: z.string().min(3).max(200),
     startTime: z.string().datetime(),
     endTime: z.string().datetime(),
-    type: z.enum(['VIDEO', 'PHONE', 'IN_PERSON']),
+    type: z.enum(['VIDEO', 'VIDEO_CALL', 'PHONE', 'PHONE_CALL', 'IN_PERSON']),
     notes: z.string().max(1000).optional(),
+    category: z.string().max(80).optional(),
+    fee: z.union([z.number(), z.string()]).optional(),
   }),
 
   // Messages
@@ -188,5 +194,20 @@ export const RequestSchemas = {
     conversationId: ValidatedSchemas.uuid,
     content: z.string().min(1).max(5000),
     fileUrl: ValidatedSchemas.url.optional(),
+    replyToId: ValidatedSchemas.uuid.optional(),
+    messageType: z.enum(['TEXT', 'IMAGE', 'FILE', 'AUDIO', 'SYSTEM']).optional(),
+    attachments: z
+      .array(
+        z.object({
+          id: z.string().optional(),
+          name: z.string().min(1).max(255),
+          size: z.number().nonnegative().optional(),
+          mimeType: z.string().max(128).optional(),
+          url: z.string().max(2048).optional(),
+          path: z.string().max(1024).optional(),
+        })
+      )
+      .max(10)
+      .optional(),
   }),
 };

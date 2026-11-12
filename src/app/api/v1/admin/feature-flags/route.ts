@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       .upsert(
         {
           key: parsed.key,
+          name: parsed.name || parsed.key,
           description: parsed.description,
           enabled: parsed.isEnabled,
           rollout_percentage: parsed.rolloutPercentage,

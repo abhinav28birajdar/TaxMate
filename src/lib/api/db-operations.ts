@@ -4,8 +4,10 @@
  */
 
 import { createClient as createServerClient } from '@/utils/supabase/server';
+import { getServiceClient } from '@/lib/backend/supabase';
+import { getResolvedClientIdsForUser } from '@/lib/api/server-auth';
 import { ApiError, ERROR_CODES, HTTP_STATUS } from './response';
-import { sanitizeObject } from './validation';
+import { sanitizeObject, sanitizeString } from './validation';
 
 // Type for operation result
 export interface OperationResult<T> {
@@ -25,6 +27,9 @@ export async function dbQuery<T>(
     const result = await operation();
     return result;
   } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
     console.error(`Database operation failed: ${operationName}`, error);
 
     throw new ApiError(`Database operation failed: ${operationName}`, {
@@ -77,19 +82,22 @@ export async function createCaseRecord(
   userId: string,
   caseData: {
     title: string;
-    description: string;
-    clientId: string;
+    description?: string;
+    clientId?: string | null;
+    clientName?: string;
+    caseType?: string;
+    tags?: string[];
     assignedCaId?: string;
-    priority: string;
-    deadline?: string;
+    priority?: string;
+    deadline?: string | null;
   }
 ) {
   return dbQuery(async () => {
-    const supabase = await createServerClient();
+    const supabase = getServiceClient();
 
     const sanitized = sanitizeObject({
       title: caseData.title,
-      description: caseData.description,
+      description: caseData.description || '',
     });
 
     const priorityMap: Record<string, string> = {
@@ -98,21 +106,41 @@ export async function createCaseRecord(
       'high': 'HIGH',
       'urgent': 'URGENT',
     };
-    const dbPriority = priorityMap[caseData.priority?.toLowerCase()] || 'MEDIUM';
+    const dbPriority = priorityMap[caseData.priority?.toLowerCase() || 'medium'] || 'MEDIUM';
+
+    let resolvedClientName = caseData.clientName || '';
+    if (!resolvedClientName && caseData.clientId) {
+      const [{ data: cRow }, { data: uRow }] = await Promise.all([
+        supabase.from('clients').select('full_name, display_name').eq('id', caseData.clientId).maybeSingle(),
+        supabase.from('users').select('name').eq('id', caseData.clientId).maybeSingle(),
+      ]);
+      resolvedClientName = cRow?.display_name || cRow?.full_name || uRow?.name || 'Client Entity';
+    }
+
+    const parsedDeadline = caseData.deadline
+      ? new Date(caseData.deadline).toISOString().split('T')[0]
+      : null;
 
     const { data, error } = await supabase
       .from('cases')
       .insert({
         title: sanitized.title,
-        description: sanitized.description,
+        description: sanitized.description || null,
         ca_id: userId,
-        client_id: caseData.clientId,
+        client_id: caseData.clientId || null,
         assigned_to: caseData.assignedCaId || userId,
         status: 'open',
         priority: dbPriority as any,
-        deadline: caseData.deadline,
+        deadline: parsedDeadline,
         case_number: `CASE-${Date.now()}`,
-        case_type: 'GENERAL',
+        case_type: caseData.caseType || 'Income Tax Return',
+        metadata: {
+          clientName: resolvedClientName || 'Client Entity',
+          tags: Array.isArray(caseData.tags) && caseData.tags.length > 0 ? caseData.tags : [caseData.caseType || 'Tax'],
+          docsCount: 0,
+          tasksDone: 0,
+          totalTasks: 0,
+        },
       })
       .select()
       .single();
@@ -246,15 +274,19 @@ export async function createAppointmentRecord(
   userId: string,
   appointmentData: {
     clientId: string;
+    caId?: string;
     title: string;
     startTime: string;
     endTime: string;
     type: string;
     notes?: string;
+    category?: string;
+    fee?: string | number;
+    createdBy?: string;
   }
 ) {
   return dbQuery(async () => {
-    const supabase = await createServerClient();
+    const supabase = getServiceClient();
 
     const sanitized = sanitizeObject({
       title: appointmentData.title,
@@ -262,8 +294,10 @@ export async function createAppointmentRecord(
     });
 
     const typeMap: Record<string, string> = {
+      'video': 'VIDEO_CALL',
       'video_call': 'VIDEO_CALL',
       'in_person': 'IN_PERSON',
+      'phone': 'PHONE_CALL',
       'phone_call': 'PHONE_CALL',
     };
     const dbType = typeMap[appointmentData.type?.toLowerCase()] || 'VIDEO_CALL';
@@ -274,11 +308,17 @@ export async function createAppointmentRecord(
         title: sanitized.title,
         notes: sanitized.notes,
         client_id: appointmentData.clientId,
-        ca_id: userId,
+        ca_id: appointmentData.caId || userId,
+        created_by: appointmentData.createdBy || userId,
         type: dbType as any,
+        appointment_type: appointmentData.category || 'Tax Consultation',
         start_time: appointmentData.startTime,
         end_time: appointmentData.endTime,
-        status: 'PENDING',
+        status: 'CONFIRMED',
+        metadata: {
+          category: appointmentData.category || 'Tax Planning',
+          fee: appointmentData.fee || 'Included',
+        },
       })
       .select()
       .single();
@@ -297,22 +337,84 @@ export async function createMessageRecord(
     conversationId: string;
     content: string;
     fileUrl?: string;
+    replyToId?: string;
+    messageType?: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO' | 'SYSTEM';
+    attachments?: Array<{
+      id?: string;
+      name: string;
+      size?: number;
+      mimeType?: string;
+      url?: string;
+      path?: string;
+    }>;
   }
 ) {
   return dbQuery(async () => {
     const supabase = await createServerClient();
 
-    const sanitized = sanitizeObject({
-      content: messageData.content,
-    });
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('id, participant_ids, ca_id, client_id')
+      .eq('id', messageData.conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      throw new ApiError('Conversation not found', {
+        code: ERROR_CODES.NOT_FOUND,
+        statusCode: HTTP_STATUS.NOT_FOUND,
+      });
+    }
+
+    const resolvedClientIds = await getResolvedClientIdsForUser(userId);
+    const isParticipant =
+      conversation.participant_ids?.includes(userId) ||
+      conversation.ca_id === userId ||
+      (conversation.client_id ? resolvedClientIds.includes(conversation.client_id) : false);
+
+    if (!isParticipant) {
+      throw new ApiError('Not authorized to send messages in this conversation', {
+        code: ERROR_CODES.FORBIDDEN,
+        statusCode: HTTP_STATUS.FORBIDDEN,
+      });
+    }
+
+    if (messageData.replyToId) {
+      const { data: replyTarget } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('id', messageData.replyToId)
+        .eq('conversation_id', messageData.conversationId)
+        .maybeSingle();
+
+      if (!replyTarget) {
+        throw new ApiError('Referenced message not found in this conversation', {
+          code: ERROR_CODES.INVALID_INPUT,
+          statusCode: HTTP_STATUS.BAD_REQUEST,
+        });
+      }
+    }
+
+    const cleanContent = sanitizeString(messageData.content, 5000);
+    const attachments = Array.isArray(messageData.attachments) ? messageData.attachments : [];
+    const resolvedType =
+      messageData.messageType ||
+      (attachments.some((a) => a.mimeType?.startsWith('image/'))
+        ? 'IMAGE'
+        : attachments.some((a) => a.mimeType?.startsWith('audio/'))
+          ? 'AUDIO'
+          : attachments.length > 0 || messageData.fileUrl
+            ? 'FILE'
+            : 'TEXT');
 
     const { data, error } = await supabase
       .from('messages')
       .insert({
-        content: sanitized.content,
+        content: cleanContent,
         conversation_id: messageData.conversationId,
         sender_id: userId,
-        message_type: messageData.fileUrl ? 'FILE' : 'TEXT',
+        reply_to_id: messageData.replyToId || null,
+        message_type: resolvedType,
+        attachments,
         metadata: messageData.fileUrl ? { fileUrl: messageData.fileUrl } : {},
       })
       .select()

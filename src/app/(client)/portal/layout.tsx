@@ -1,10 +1,16 @@
 'use client';
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import { DashboardSidebar } from '@/components/dashboard/sidebar';
 import { DashboardHeader } from '@/components/dashboard/header';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
+    const pathname = usePathname();
+    if (pathname === '/portal/login') {
+        return <>{children}</>;
+    }
+
     return (
         <div className="flex h-screen overflow-hidden bg-black text-foreground selection:bg-primary selection:text-black font-sans">
             <DashboardSidebar />

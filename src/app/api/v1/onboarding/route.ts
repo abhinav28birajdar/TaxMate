@@ -3,6 +3,8 @@ import { fail, ok } from '@/lib/backend/response';
 import { onboardingSchema } from '@/lib/backend/validation';
 import { requireAuth, supabaseAdmin } from '@/lib/backend/supabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);

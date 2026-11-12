@@ -1,18 +1,64 @@
 'use client';
 
-import { useState } from 'react';
-import { Calendar, Bell, ShieldAlert, CheckCircle2, Clock, Filter, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, Bell, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
+import { useRealtimeSubscription } from '@/hooks/use-realtime';
+
+type ComplianceItem = {
+  id: string;
+  title: string;
+  compliance_type: string;
+  client_id: string;
+  due_date: string;
+  priority: string;
+  status: string;
+};
 
 export default function CAComplianceCalendarPage() {
-  const [filter, setFilter] = useState('all');
+  const { user } = useAuth();
+  const [complianceItems, setComplianceItems] = useState<ComplianceItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const complianceItems = [
-    { id: 'c1', title: 'GSTR-3B Filing (Monthly)', type: 'GST', client: 'TechNova Solutions', due: '20 Oct 2026', priority: 'Urgent', status: 'Pending', reminderDays: '2 Days Left' },
-    { id: 'c2', title: 'TDS Payment Deposit (Form 26Q)', type: 'TDS', client: 'Apex Logistics', due: '31 Oct 2026', priority: 'High', status: 'Pending', reminderDays: '13 Days Left' },
-    { id: 'c3', title: 'Advance Tax 3rd Installment', type: 'Income Tax', client: 'Dr. Vikramaditya Rao', due: '15 Dec 2026', priority: 'Medium', status: 'Not Started', reminderDays: '58 Days Left' },
-    { id: 'c4', title: 'ROC Form AOC-4 Filing', type: 'ROC', client: 'Global Software Inc', due: '30 Oct 2026', priority: 'High', status: 'Completed', reminderDays: 'Done' },
-  ];
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let active = true;
+    const loadItems = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('compliance_items')
+        .select('id, title, compliance_type, client_id, due_date, priority, status')
+        .eq('ca_id', user.id)
+        .order('due_date', { ascending: true });
+
+      if (active) {
+        if (error) console.error('Unable to load compliance items:', error);
+        setComplianceItems((data as ComplianceItem[] | null) ?? []);
+        setLoading(false);
+      }
+    };
+
+    void loadItems();
+    return () => { active = false; };
+  }, [user?.id]);
+
+  useRealtimeSubscription<ComplianceItem>(
+    'compliance_items',
+    user?.id ? `ca_id=eq.${user.id}` : undefined,
+    (item) => setComplianceItems((current) => [...current, item].sort((a, b) => a.due_date.localeCompare(b.due_date))),
+    (item) => setComplianceItems((current) => current.map((existing) => existing.id === item.id ? item : existing)),
+    (item) => setComplianceItems((current) => current.filter((existing) => existing.id !== item.id))
+  );
+
+  const pendingCount = complianceItems.filter((item) => item.status !== 'completed').length;
+  const completedCount = complianceItems.filter((item) => item.status === 'completed').length;
+  const urgentCount = complianceItems.filter((item) => {
+    const days = Math.ceil((new Date(item.due_date).getTime() - Date.now()) / 86400000);
+    return item.status !== 'completed' && days <= 3;
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -31,11 +77,11 @@ export default function CAComplianceCalendarPage() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
           <span className="text-xs font-semibold text-slate-500">Urgent (Due in 3 Days)</span>
-          <div className="text-2xl font-extrabold text-red-500 mt-1">1 Task</div>
+          <div className="text-2xl font-extrabold text-red-500 mt-1">{urgentCount} Tasks</div>
         </div>
         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
           <span className="text-xs font-semibold text-slate-500">Upcoming (This Month)</span>
-          <div className="text-2xl font-extrabold text-amber-500 mt-1">3 Tasks</div>
+          <div className="text-2xl font-extrabold text-amber-500 mt-1">{pendingCount} Tasks</div>
         </div>
         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
           <span className="text-xs font-semibold text-slate-500">Automated Reminders</span>
@@ -43,7 +89,7 @@ export default function CAComplianceCalendarPage() {
         </div>
         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
           <span className="text-xs font-semibold text-slate-500">Filing Rate</span>
-          <div className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">94.8%</div>
+          <div className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">{completedCount}/{complianceItems.length || 0}</div>
         </div>
       </div>
 
@@ -60,21 +106,23 @@ export default function CAComplianceCalendarPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+            {loading && <tr><td colSpan={6} className="py-8 px-4 text-center text-slate-500">Loading compliance items...</td></tr>}
+            {!loading && complianceItems.length === 0 && <tr><td colSpan={6} className="py-8 px-4 text-center text-slate-500">No compliance items assigned yet.</td></tr>}
             {complianceItems.map((item) => (
               <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                 <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">{item.title}</td>
-                <td className="py-3.5 px-4 font-semibold text-lime-600 dark:text-lime-400">{item.type}</td>
-                <td className="py-3.5 px-4">{item.client}</td>
-                <td className="py-3.5 px-4 font-medium">{item.due}</td>
+                <td className="py-3.5 px-4 font-semibold text-lime-600 dark:text-lime-400">{item.compliance_type}</td>
+                <td className="py-3.5 px-4">{item.client_id}</td>
+                <td className="py-3.5 px-4 font-medium">{new Date(item.due_date).toLocaleDateString('en-IN')}</td>
                 <td className="py-3.5 px-4">
                   <span className="text-xs font-bold text-red-500 flex items-center gap-1">
-                    <Bell className="w-3.5 h-3.5" /> {item.reminderDays}
+                    <Bell className="w-3.5 h-3.5" /> {Math.max(0, Math.ceil((new Date(item.due_date).getTime() - Date.now()) / 86400000))} Days
                   </span>
                 </td>
                 <td className="py-3.5 px-4">
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      item.status === 'Completed'
+                      item.status === 'completed'
                         ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                         : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
                     }`}

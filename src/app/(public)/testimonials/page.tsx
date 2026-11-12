@@ -10,7 +10,6 @@ export default function TestimonialsPage() {
     {
       author: "Vikram Mehta",
       role: "Founder & CEO, CloudScale Technologies",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop",
       rating: 5,
       service: "Pvt Ltd Tax Filing & 80-IAC Exemption",
       comment: "TaxMate transformed our tax compliance. Our assigned CA handled complex Section 56 angel tax documentation with zero back-and-forth email loops. The video consultation with synchronized document viewer saved us weeks."
@@ -18,15 +17,13 @@ export default function TestimonialsPage() {
     {
       author: "CA Priya Swaminathan, FCA",
       role: "Managing Partner, Swaminathan & Associates",
-      avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&h=120&fit=crop",
       rating: 5,
       service: "CA Practice Operating System",
       comment: "Running our firm of 14 articled assistants was chaotic until TaxMate. The 6-stage Kanban workflow, automatic Form 26AS reconciliation, and client WhatsApp alerts reduced client churn to virtually zero."
     },
     {
       author: "Rohan Singhal",
-      role: "Staff Software Engineer, Google India",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop",
+      role: "Staff Software Engineer",
       rating: 5,
       service: "Salaried ITR-2 with US RSU Disclosures",
       comment: "Filing Schedule FA for foreign stock options used to be terrifying. My TaxMate CA completed the entire computation sheet with exact foreign exchange SBI TT rates in 24 hours. Flawless execution."
@@ -34,26 +31,23 @@ export default function TestimonialsPage() {
     {
       author: "Sunita Narang",
       role: "Director, Narang Exports Ltd.",
-      avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=120&h=120&fit=crop",
       rating: 5,
       service: "GSTR-3B & Export LUT Filings",
-      comment: "The automated GSTR-2B ITC reconciliation engine flagged over ₹4.8 Lakhs in unclaimed input tax credits that our previous accountant missed. TaxMate paid for itself ten times over in month one."
+      comment: "The automated GSTR-2B ITC reconciliation engine flagged unclaimed input tax credits that our previous accountant missed. TaxMate paid for itself immediately."
     },
     {
       author: "Dr. Arvind Chawla",
-      role: "Consultant Cardiologist, Max Healthcare",
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&h=120&fit=crop",
+      role: "Consultant Cardiologist",
       rating: 5,
       service: "Section 44ADA Presumptive Taxation",
-      comment: "As a busy doctor, I don't have time to understand tax law intricacies. The booking system was instantaneous, and the CA answered all questions directly on screen during our evening video appointment."
+      comment: "As a busy specialist, I don't have time to track compliance rules. The booking system was instantaneous, and the CA answered all questions directly on screen during our evening video appointment."
     },
     {
       author: "CA Rajesh Goel",
       role: "Solo Practitioner, Delhi NCR",
-      avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&h=120&fit=crop",
       rating: 5,
       service: "TaxMate Solo CA Plan",
-      comment: "The built-in billing, instant Razorpay payment receipts, and automated client KYC checks allowed me to scale from 40 clients to 180 clients in a single assessment year without hiring extra staff."
+      comment: "The built-in billing, instant Razorpay payment receipts, and automated client KYC checks allowed me to scale my active client portfolio smoothly without administrative overhead."
     }
   ];
 
@@ -125,11 +119,9 @@ export default function TestimonialsPage() {
               </div>
 
               <div className="pt-3 border-t border-white/5 flex items-center gap-3">
-                <img 
-                  src={rev.avatar} 
-                  alt={rev.author}
-                  className="w-10 h-10 rounded-xl object-cover border border-white/10"
-                />
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-xs font-bold text-emerald-300">
+                  {rev.author.replace(/^CA\s+|^Dr\.\s+/i, "").slice(0, 2).toUpperCase()}
+                </div>
                 <div>
                   <h4 className="font-bold text-xs text-white group-hover:text-emerald-400 transition-colors">
                     {rev.author}

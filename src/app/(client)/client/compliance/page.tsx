@@ -1,16 +1,55 @@
 'use client';
 
-import { useState } from 'react';
-import { Calendar, Bell, ShieldCheck, Clock, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
+import { Calendar, Bell } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/hooks/UnifiedAuthContext';
+import { useRealtimeSubscription } from '@/hooks/use-realtime';
+
+type ComplianceItem = {
+  id: string;
+  title: string;
+  compliance_type: string;
+  due_date: string;
+  priority: string;
+  status: string;
+};
 
 export default function ClientCompliancePage() {
-  const deadlines = [
-    { title: 'GSTR-3B Filing September 2026', type: 'GST Statutory', dueDate: '20 Oct 2026', daysLeft: '3 Days', urgency: 'HIGH' },
-    { title: 'Corporate ITR Audit Return Filing (AY 2026-27)', type: 'Income Tax Audit', dueDate: '31 Oct 2026', daysLeft: '14 Days', urgency: 'MEDIUM' },
-    { title: 'TDS Quarter 2 Return Filing (Form 26Q)', type: 'TDS Compliance', dueDate: '31 Oct 2026', daysLeft: '14 Days', urgency: 'MEDIUM' },
-    { title: 'Advance Tax 3rd Installment (75%)', type: 'Income Tax Advance', dueDate: '15 Dec 2026', daysLeft: '53 Days', urgency: 'LOW' },
-  ];
+  const { user } = useAuth();
+  const [deadlines, setDeadlines] = useState<ComplianceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let active = true;
+    const loadDeadlines = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('compliance_items')
+        .select('id, title, compliance_type, due_date, priority, status')
+        .eq('client_id', user.id)
+        .order('due_date', { ascending: true });
+
+      if (active) {
+        if (error) console.error('Unable to load compliance items:', error);
+        setDeadlines((data as ComplianceItem[] | null) ?? []);
+        setLoading(false);
+      }
+    };
+
+    void loadDeadlines();
+    return () => { active = false; };
+  }, [user?.id]);
+
+  useRealtimeSubscription<ComplianceItem>(
+    'compliance_items',
+    user?.id ? `client_id=eq.${user.id}` : undefined,
+    (item) => setDeadlines((current) => [...current, item].sort((a, b) => a.due_date.localeCompare(b.due_date))),
+    (item) => setDeadlines((current) => current.map((existing) => existing.id === item.id ? item : existing)),
+    (item) => setDeadlines((current) => current.filter((existing) => existing.id !== item.id))
+  );
 
   return (
     <div className="space-y-6">
@@ -22,27 +61,33 @@ export default function ClientCompliancePage() {
       </div>
 
       <div className="space-y-3">
-        {deadlines.map((d, i) => (
-          <div key={i} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
+        {loading && <p className="text-sm text-slate-500">Loading compliance items...</p>}
+        {!loading && deadlines.length === 0 && <p className="text-sm text-slate-500">No compliance deadlines are assigned yet.</p>}
+        {deadlines.map((deadline) => {
+          const daysLeft = Math.ceil((new Date(deadline.due_date).getTime() - Date.now()) / 86400000);
+          const urgency = deadline.priority.toUpperCase();
+          return (
+          <div key={deadline.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-lime-600/10 text-lime-600 flex items-center justify-center font-bold text-xs shrink-0">
                 <Calendar className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white">{d.title}</h4>
-                <p className="text-xs text-slate-400">{d.type} • Due: {d.dueDate}</p>
+                <h4 className="font-bold text-sm text-slate-900 dark:text-white">{deadline.title}</h4>
+                <p className="text-xs text-slate-400">{deadline.compliance_type} • Due: {new Date(deadline.due_date).toLocaleDateString('en-IN')}</p>
               </div>
             </div>
 
             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-              d.urgency === 'HIGH'
+              urgency === 'HIGH' || daysLeft <= 3
                 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30'
                 : 'bg-lime-600/20 text-lime-600 dark:text-lime-400 border-lime-500/30'
             }`}>
-              {d.daysLeft}
+              {daysLeft < 0 ? 'Overdue' : `${daysLeft} Days`}
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

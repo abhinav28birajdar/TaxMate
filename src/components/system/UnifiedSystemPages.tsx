@@ -2,31 +2,31 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { 
-  Loader2, 
-  Inbox, 
-  WifiOff, 
-  ServerCrash, 
-  FileQuestion, 
-  ShieldAlert, 
-  Clock, 
-  Wrench, 
-  UploadCloud, 
-  CreditCard, 
-  UserX, 
-  AlertOctagon, 
-  CheckCircle2, 
-  Trash2, 
-  ArrowLeft, 
-  RefreshCw, 
-  Home, 
-  ChevronRight,
-  ShieldCheck,
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  Loader2,
+  Inbox,
+  WifiOff,
+  ServerCrash,
+  FileQuestion,
+  ShieldAlert,
+  Clock,
+  Wrench,
+  UploadCloud,
+  CreditCard,
+  UserX,
+  AlertOctagon,
+  CheckCircle2,
+  Trash2,
+  ArrowLeft,
+  RefreshCw,
+  Home,
   AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export type SystemPageState = 
+export type SystemPageState =
   | "loading"
   | "empty"
   | "no-internet"
@@ -47,17 +47,43 @@ interface UnifiedSystemPagesProps {
 }
 
 export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPagesProps) {
+  const router = useRouter();
   const [activeState, setActiveState] = useState<SystemPageState>(initialState);
   const [isRetrying, setIsRetrying] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [itemDeleted, setItemDeleted] = useState(false);
 
-  const simulateAction = (msg: string) => {
+  const checkHealthAndRetry = async () => {
     setIsRetrying(true);
-    setTimeout(() => {
+    try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        toast.error("Still offline. Please check your network connection.");
+        return;
+      }
+      const res = await fetch("/api/health", { cache: "no-store" });
+      if (res.ok) {
+        toast.success("Server health verified! Connection restored.");
+        router.refresh();
+      } else {
+        toast.error(`Server returned HTTP ${res.status}. Please try again shortly.`);
+      }
+    } catch {
+      toast.error("Unable to reach TaxMate servers. Please check connectivity.");
+    } finally {
       setIsRetrying(false);
-      alert(msg);
-    }, 1200);
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteConfirmText.trim() !== "DELETE-PERMANENTLY") {
+      toast.error('Please type "DELETE-PERMANENTLY" exactly to confirm.');
+      return;
+    }
+    setShowDeleteModal(false);
+    setDeleteConfirmText("");
+    setItemDeleted(true);
+    toast.success("Confirmation verified.");
   };
 
   const systemStates: { id: SystemPageState; label: string; icon: React.ReactNode; badge: string; color: string }[] = [
@@ -79,7 +105,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col relative overflow-hidden">
-      {/* Background orbs */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-20" />
       <div className="absolute top-0 left-1/4 w-[500px] h-[350px] bg-emerald-600/10 rounded-full blur-[120px] pointer-events-none -z-10" />
       <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none -z-10" />
@@ -87,19 +112,19 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
       {/* Top Bar Navigator */}
       <header className="border-b border-white/10 bg-[#111111]/80 backdrop-blur-md sticky top-0 z-30 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/modules" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back to Modules
+          <Link href="/" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back to Home
           </Link>
           <span className="text-white/20">|</span>
           <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-            Module 20: 14 System Pages
+            System States & Recovery Center
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400 hidden sm:inline">Active State:</span>
-          <select 
-            value={activeState} 
+          <select
+            value={activeState}
             onChange={(e) => setActiveState(e.target.value as SystemPageState)}
             className="bg-[#1A1A1A] border border-white/10 text-white rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:border-emerald-500"
           >
@@ -131,10 +156,8 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
         ))}
       </div>
 
-      {/* Main Content Area Rendering Selected State */}
       <main className="flex-1 flex items-center justify-center p-6 sm:p-12 relative z-10">
         <div className="max-w-xl w-full">
-          {/* 1. Loading Screen */}
           {activeState === "loading" && (
             <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl relative">
               <div className="relative w-20 h-20 mx-auto mb-6 flex items-center justify-center">
@@ -148,16 +171,14 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Syncing Tax Records & Vault</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                Establishing end-to-end encrypted connection with the Income Tax Department & GSTN gateways...
+                Establishing end-to-end encrypted session with your TaxMate vault and compliance ledger...
               </p>
               <div className="w-full bg-[#1A1A1A] rounded-full h-1.5 mt-8 overflow-hidden">
                 <div className="bg-emerald-500 h-full w-2/3 rounded-full animate-pulse" />
               </div>
-              <p className="text-[11px] text-gray-500 mt-3 font-mono">Verifying SHA-256 Checksums • 78%</p>
             </div>
           )}
 
-          {/* 2. Empty State */}
           {activeState === "empty" && (
             <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-5 text-gray-400">
@@ -168,7 +189,7 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">No Tax Documents Yet</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                You haven&apos;t uploaded any Form 16, bank statements, or capital gains proofs for Assessment Year 2026-27.
+                You haven&apos;t uploaded any Form 16, bank statements, or capital gains proofs for the active Assessment Year.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
                 <Link href="/client/documents">
@@ -185,7 +206,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
             </div>
           )}
 
-          {/* 3. No Internet */}
           {activeState === "no-internet" && (
             <div className="bg-[#111111] border border-amber-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-5 text-amber-400">
@@ -194,24 +214,23 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-amber-500/10 border border-amber-500/20 text-amber-400">
                 Network Disconnected
               </span>
-              <h2 className="text-2xl font-bold text-white mt-4">Offline Mode Activated</h2>
+              <h2 className="text-2xl font-bold text-white mt-4">Offline Mode Detected</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                Unable to reach the TaxMate cloud servers. Your local draft changes are preserved in your browser storage.
+                Unable to reach TaxMate cloud servers. Check your internet connectivity and retry to sync pending updates.
               </p>
               <div className="mt-8 flex justify-center">
-                <Button 
-                  onClick={() => simulateAction("Network connection verified! Syncing pending changes.")}
+                <Button
+                  onClick={checkHealthAndRetry}
                   disabled={isRetrying}
                   className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-6 py-2.5 rounded-xl font-medium"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isRetrying ? "animate-spin" : ""}`} />
-                  {isRetrying ? "Reconnecting..." : "Check Connection Again"}
+                  {isRetrying ? "Verifying..." : "Check Connection Again"}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* 4. 500 Server Error */}
           {activeState === "server-error" && (
             <div className="bg-[#111111] border border-rose-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto mb-5 text-rose-400">
@@ -222,18 +241,18 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Something went wrong on our end</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                Our engineering team has been automatically alerted. Trace ID: <span className="font-mono text-xs text-rose-300">TM-ERR-88219</span>
+                Our server encountered an unexpected issue while completing this request.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
-                <Button 
-                  onClick={() => simulateAction("Server responded OK. Reloading.")}
+                <Button
+                  onClick={checkHealthAndRetry}
                   disabled={isRetrying}
                   className="bg-rose-600 hover:bg-rose-700 text-white text-xs px-5 py-2.5 rounded-xl font-medium"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isRetrying ? "animate-spin" : ""}`} />
                   Retry Request
                 </Button>
-                <Link href="/support">
+                <Link href="/help">
                   <Button variant="outline" className="border-white/10 text-gray-300 hover:bg-white/5 text-xs px-5 py-2.5 rounded-xl">
                     Report Incident
                   </Button>
@@ -242,7 +261,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
             </div>
           )}
 
-          {/* 5. 404 Page Not Found */}
           {activeState === "404" && (
             <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mx-auto mb-5 text-cyan-400">
@@ -253,7 +271,7 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Page or Docket Not Found</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                The URL you requested does not exist, was moved to a new tax assessment year, or requires authorization.
+                The URL you requested does not exist, was moved to a new assessment year, or requires authorization.
               </p>
               <div className="flex items-center justify-center gap-3 mt-6">
                 <Link href="/">
@@ -261,16 +279,15 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
                     <Home className="w-4 h-4 mr-2" /> Go to Homepage
                   </Button>
                 </Link>
-                <Link href="/modules">
+                <Link href="/help">
                   <Button variant="outline" className="border-white/10 text-gray-300 hover:bg-white/5 text-xs px-5 py-2.5 rounded-xl">
-                    Explore 20 Modules
+                    Help &amp; Support Center
                   </Button>
                 </Link>
               </div>
             </div>
           )}
 
-          {/* 6. Permission Denied (403) */}
           {activeState === "permission-denied" && (
             <div className="bg-[#111111] border border-orange-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center mx-auto mb-5 text-orange-400">
@@ -281,10 +298,10 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Access Restricted</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                You do not have the required Chartered Accountant or Firm Partner role to review confidential client dossiers.
+                You do not have the required role or permission to access this resource.
               </p>
               <div className="mt-6 flex justify-center">
-                <Link href="/ca/dashboard">
+                <Link href="/dashboard">
                   <Button className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-5 py-2.5 rounded-xl font-medium">
                     Switch to Authorized Portal
                   </Button>
@@ -293,7 +310,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
             </div>
           )}
 
-          {/* 7. Session Expired */}
           {activeState === "session-expired" && (
             <div className="bg-[#111111] border border-yellow-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mx-auto mb-5 text-yellow-400">
@@ -304,7 +320,7 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Session Timed Out</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                For compliance with ICAI and RBI security standards, your session was locked after 15 minutes of inactivity.
+                Your authenticated session expired for account security. Please sign in again to continue.
               </p>
               <div className="mt-6 flex justify-center">
                 <Link href="/login">
@@ -316,7 +332,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
             </div>
           )}
 
-          {/* 8. Maintenance Mode */}
           {activeState === "maintenance" && (
             <div className="bg-[#111111] border border-blue-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mx-auto mb-5 text-blue-400">
@@ -327,15 +342,22 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Upgrading Tax Engine</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                We are applying Budget 2026 tax slab updates and CBDT schema patches. We expect to be back online at 04:00 AM IST.
+                We are applying tax schema updates and security patches. Service will resume shortly.
               </p>
-              <div className="mt-6 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 max-w-xs mx-auto">
-                All client filings already queued will auto-submit once CBDT APIs reopen.
+              <div className="mt-6 flex justify-center">
+                <Button
+                  onClick={checkHealthAndRetry}
+                  disabled={isRetrying}
+                  variant="outline"
+                  className="border-blue-500/30 text-blue-300 hover:bg-blue-500/10 text-xs px-5 py-2.5 rounded-xl"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isRetrying ? "animate-spin" : ""}`} />
+                  Check Status Now
+                </Button>
               </div>
             </div>
           )}
 
-          {/* 9. Upload Error */}
           {activeState === "upload-error" && (
             <div className="bg-[#111111] border border-rose-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto mb-5 text-rose-400">
@@ -346,27 +368,24 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Document Upload Rejected</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                &ldquo;Form16_PartB_Corrupted.pdf&rdquo; could not be parsed by the OCR pipeline due to password encryption or unsupported format.
+                The uploaded file exceeded 25 MB, had an unsupported MIME format, or was password-locked.
               </p>
               <div className="flex items-center justify-center gap-3 mt-6">
-                <Button 
-                  onClick={() => simulateAction("Retrying OCR ingestion with bypass...")}
-                  disabled={isRetrying}
-                  className="bg-rose-600 hover:bg-rose-700 text-white text-xs px-5 py-2.5 rounded-xl font-medium"
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${isRetrying ? "animate-spin" : ""}`} />
-                  Re-upload Without Password
-                </Button>
                 <Link href="/client/documents">
+                  <Button className="bg-rose-600 hover:bg-rose-700 text-white text-xs px-5 py-2.5 rounded-xl font-medium">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Re-upload Document
+                  </Button>
+                </Link>
+                <Link href="/client/dashboard">
                   <Button variant="outline" className="border-white/10 text-gray-300 hover:bg-white/5 text-xs px-5 py-2.5 rounded-xl">
-                    Back to Vault
+                    Dashboard
                   </Button>
                 </Link>
               </div>
             </div>
           )}
 
-          {/* 10. Payment Error */}
           {activeState === "payment-error" && (
             <div className="bg-[#111111] border border-rose-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto mb-5 text-rose-400">
@@ -377,7 +396,7 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Transaction Could Not Complete</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                Your bank declined the UPI / Card payment of ₹4,999. No money was deducted from your account.
+                Your payment gateway declined or timed out this charge. No amount was captured.
               </p>
               <div className="flex items-center justify-center gap-3 mt-6">
                 <Link href="/client/payments">
@@ -385,7 +404,7 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
                     Try Alternate Payment Method
                   </Button>
                 </Link>
-                <Link href="/support">
+                <Link href="/help">
                   <Button variant="outline" className="border-white/10 text-gray-300 hover:bg-white/5 text-xs px-5 py-2.5 rounded-xl">
                     Contact Billing Desk
                   </Button>
@@ -394,7 +413,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
             </div>
           )}
 
-          {/* 11. Verification Failed */}
           {activeState === "verification-failed" && (
             <div className="bg-[#111111] border border-amber-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-5 text-amber-400">
@@ -403,21 +421,20 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-amber-500/10 border border-amber-500/20 text-amber-400">
                 KYC Verification Failed
               </span>
-              <h2 className="text-2xl font-bold text-white mt-4">PAN-Aadhaar Name Mismatch</h2>
+              <h2 className="text-2xl font-bold text-white mt-4">Verification Incomplete</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                The name printed on your PAN card does not match the demographic details retrieved from UIDAI Aadhaar e-KYC.
+                Please verify your PAN, Aadhaar, and email details in your profile settings to pass KYC checks.
               </p>
               <div className="mt-6 flex justify-center">
                 <Link href="/client/profile">
                   <Button className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-6 py-2.5 rounded-xl font-medium">
-                    Correct Profile Information
+                    Update Profile Information
                   </Button>
                 </Link>
               </div>
             </div>
           )}
 
-          {/* 12. Account Suspended */}
           {activeState === "account-suspended" && (
             <div className="bg-[#111111] border border-red-500/30 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-5 text-red-500">
@@ -428,10 +445,10 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">Account Suspended</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                This account has been temporarily frozen pending verification of professional membership credentials with ICAI.
+                This account is temporarily paused pending compliance review. Contact our compliance desk to submit an appeal.
               </p>
               <div className="mt-6 flex justify-center">
-                <Link href="/support">
+                <Link href="/help">
                   <Button className="bg-red-600 hover:bg-red-700 text-white text-xs px-6 py-2.5 rounded-xl font-medium">
                     Submit Appeal to Compliance Officer
                   </Button>
@@ -440,7 +457,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
             </div>
           )}
 
-          {/* 13. Success Confirmation */}
           {activeState === "success-confirmation" && (
             <div className="bg-[#111111] border border-emerald-500/30 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-5 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
@@ -449,9 +465,9 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
               <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                 Action Completed
               </span>
-              <h2 className="text-2xl font-bold text-white mt-4">ITR Filing Submitted!</h2>
+              <h2 className="text-2xl font-bold text-white mt-4">Action Completed Successfully</h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                Acknowledgment number <span className="font-mono text-emerald-400 font-bold">ACK-2026-ITR1-99214</span> generated. E-verification token sent to your registered mobile.
+                Your submission has been saved and synced with your TaxMate account.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
                 <Link href="/client/tax-returns">
@@ -468,7 +484,6 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
             </div>
           )}
 
-          {/* 14. Delete Confirmation */}
           {activeState === "delete-confirmation" && (
             <div className="bg-[#111111] border border-rose-500/20 rounded-2xl p-8 sm:p-12 text-center shadow-2xl backdrop-blur-xl">
               <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mx-auto mb-5 text-rose-400">
@@ -478,25 +493,28 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
                 Permanent Destruction
               </span>
               <h2 className="text-2xl font-bold text-white mt-4">
-                {itemDeleted ? "Document Deleted Forever" : "Delete Client Tax Vault?"}
+                {itemDeleted ? "Deletion Request Confirmed" : "Confirm Permanent Deletion"}
               </h2>
               <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
                 {itemDeleted
-                  ? "The client folder, all Form 16s, and computation sheets have been expunged from cold storage."
-                  : "This action cannot be undone. All 18 uploaded documents, computed tax drafts, and audit trails will be wiped immediately."}
+                  ? "The targeted vault folder or record deletion was verified."
+                  : "This action cannot be undone. Uploaded documents, computed tax drafts, and trails for the selected record will be removed."}
               </p>
 
               {!itemDeleted ? (
                 <div className="flex items-center justify-center gap-3 mt-6">
-                  <Button 
-                    onClick={() => setShowDeleteModal(true)}
+                  <Button
+                    onClick={() => {
+                      setDeleteConfirmText("");
+                      setShowDeleteModal(true);
+                    }}
                     className="bg-rose-600 hover:bg-rose-700 text-white text-xs px-5 py-2.5 rounded-xl font-medium"
                   >
                     Confirm Permanent Deletion
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setActiveState("empty")}
+                  <Button
+                    variant="outline"
+                    onClick={() => router.back()}
                     className="border-white/10 text-gray-300 hover:bg-white/5 text-xs px-5 py-2.5 rounded-xl"
                   >
                     Cancel
@@ -504,17 +522,17 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
                 </div>
               ) : (
                 <div className="mt-6 flex justify-center">
-                  <Button 
-                    onClick={() => setItemDeleted(false)}
-                    variant="outline"
-                    className="border-white/10 text-gray-300 hover:bg-white/5 text-xs px-5 py-2.5 rounded-xl"
-                  >
-                    Reset Demo State
-                  </Button>
+                  <Link href="/dashboard">
+                    <Button
+                      variant="outline"
+                      className="border-white/10 text-gray-300 hover:bg-white/5 text-xs px-5 py-2.5 rounded-xl"
+                    >
+                      Return to Dashboard
+                    </Button>
+                  </Link>
                 </div>
               )}
 
-              {/* Interactive Modal */}
               {showDeleteModal && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
                   <div className="bg-[#181818] border border-rose-500/40 rounded-2xl p-6 max-w-md w-full text-left space-y-4 shadow-2xl">
@@ -522,29 +540,29 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
                       <AlertTriangle className="w-5 h-5" /> Are you absolutely sure?
                     </div>
                     <p className="text-xs text-gray-300 leading-relaxed">
-                      Please type <strong className="text-white font-mono">DELETE-PERMANENTLY</strong> to confirm this irreversible destruction.
+                      Please type <strong className="text-white font-mono">DELETE-PERMANENTLY</strong> to confirm this irreversible action.
                     </p>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
                       placeholder="DELETE-PERMANENTLY"
                       className="w-full bg-[#111111] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 font-mono"
                     />
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         onClick={() => setShowDeleteModal(false)}
                         className="text-xs text-gray-400 hover:text-white"
                       >
                         Abort
                       </Button>
-                      <Button 
-                        onClick={() => {
-                          setShowDeleteModal(false);
-                          setItemDeleted(true);
-                        }}
-                        className="bg-rose-600 hover:bg-rose-700 text-white text-xs px-4 rounded-xl"
+                      <Button
+                        onClick={handleConfirmDelete}
+                        disabled={deleteConfirmText.trim() !== "DELETE-PERMANENTLY"}
+                        className="bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs px-4 rounded-xl"
                       >
-                        Yes, Erase Everything
+                        Yes, Confirm Action
                       </Button>
                     </div>
                   </div>
@@ -555,9 +573,8 @@ export function UnifiedSystemPages({ initialState = "loading" }: UnifiedSystemPa
         </div>
       </main>
 
-      {/* Footer Info */}
       <footer className="border-t border-white/10 bg-[#0E0E0E] px-6 py-4 text-center text-xs text-gray-500">
-        TaxMate System Status Engine • Built for Indian CAs & Taxpayers • 14 Critical System States
+        TaxMate System Status Engine • Built for Indian CAs & Taxpayers
       </footer>
     </div>
   );

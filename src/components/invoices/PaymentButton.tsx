@@ -35,7 +35,7 @@ interface PaymentButtonProps {
  *   onPaymentSuccess={handleSuccess}
  * />
  */
-export default function PaymentButton({
+export function PaymentButton({
   invoiceId,
   invoiceNumber,
   amount,
@@ -52,104 +52,115 @@ export default function PaymentButton({
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  const loadRazorpaySdk = (): Promise<boolean> => {
+    if (typeof window !== 'undefined' && (window as any).Razorpay) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]') as HTMLScriptElement | null;
+      if (existing) {
+        existing.addEventListener('load', () => resolve(true));
+        existing.addEventListener('error', () => resolve(false));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handlePaymentClick = async () => {
     setIsProcessing(true);
     setPaymentStatus('idle');
     setErrorMessage('');
 
     try {
-      // Load Razorpay script
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      document.body.appendChild(script);
+      const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
+      if (!keyId || keyId.includes('placeholder')) {
+        throw new Error('Payment gateway is not configured in this environment (NEXT_PUBLIC_RAZORPAY_KEY_ID missing).');
+      }
 
-      script.onload = async () => {
-        try {
-          // Create order on backend
-          const orderResponse = await fetch('/api/payments/create-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              invoiceId,
-              invoiceNumber,
-              amount: Math.round(amount * 100), // Convert to paise
-              clientName,
-              clientEmail,
-            }),
-          });
+      const loaded = await loadRazorpaySdk();
+      if (!loaded) {
+        throw new Error('Failed to load payment gateway');
+      }
 
-          if (!orderResponse.ok) {
-            throw new Error('Failed to create payment order');
+      const orderResponse = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceId,
+          invoiceNumber,
+          amount: Math.round(amount * 100),
+          clientName,
+          clientEmail,
+        }),
+      });
+
+      if (!orderResponse.ok) {
+        const errData = await orderResponse.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to create payment order');
+      }
+
+      const { orderId, amount: authoritativeAmount } = await orderResponse.json();
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
+        amount: authoritativeAmount || Math.round(amount * 100),
+        currency: 'INR',
+        name: 'TaxMate',
+        description: `Invoice ${invoiceNumber}`,
+        order_id: orderId,
+        handler: async function (response: any) {
+          try {
+            const verifyResponse = await fetch('/api/payments/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpayOrderId: response.razorpay_order_id || orderId,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                invoiceId,
+              }),
+            });
+
+            if (verifyResponse.ok) {
+              setPaymentStatus('success');
+              onPaymentSuccess?.(response.razorpay_payment_id);
+            } else {
+              const errData = await verifyResponse.json().catch(() => ({}));
+              throw new Error(errData.error || 'Payment verification failed');
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Verification failed';
+            setPaymentStatus('error');
+            setErrorMessage(message);
+            onPaymentError?.(message);
+          } finally {
+            setIsProcessing(false);
           }
-
-          const { orderId } = await orderResponse.json();
-
-          // Open Razorpay checkout
-          const options = {
-            key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '',
-            amount: Math.round(amount * 100), // Amount in paise
-            currency: 'INR',
-            name: 'TaxMate',
-            description: `Invoice ${invoiceNumber}`,
-            order_id: orderId,
-            handler: async function (response: any) {
-              try {
-                // Verify payment on backend
-                const verifyResponse = await fetch('/api/payments/verify-payment', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    orderId,
-                    paymentId: response.razorpay_payment_id,
-                    signature: response.razorpay_signature,
-                    invoiceId,
-                  }),
-                });
-
-                if (verifyResponse.ok) {
-                  setPaymentStatus('success');
-                  onPaymentSuccess?.(response.razorpay_payment_id);
-                } else {
-                  throw new Error('Payment verification failed');
-                }
-              } catch (error) {
-                const message = error instanceof Error ? error.message : 'Verification failed';
-                setPaymentStatus('error');
-                setErrorMessage(message);
-                onPaymentError?.(message);
-              }
-            },
-            prefill: {
-              name: clientName,
-              email: clientEmail,
-            },
-            theme: {
-              color: '#65a30d', // Lime-600
-            },
-          };
-
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Failed to initialize payment';
-          setPaymentStatus('error');
-          setErrorMessage(message);
-          onPaymentError?.(message);
-        }
+        },
+        modal: {
+          ondismiss: () => setIsProcessing(false),
+        },
+        prefill: {
+          name: clientName,
+          email: clientEmail,
+        },
+        theme: {
+          color: '#65a30d',
+        },
       };
 
-      script.onerror = () => {
-        const message = 'Failed to load payment gateway';
-        setPaymentStatus('error');
-        setErrorMessage(message);
-        onPaymentError?.(message);
-      };
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Payment error';
       setPaymentStatus('error');
       setErrorMessage(message);
       onPaymentError?.(message);
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -216,3 +227,6 @@ export default function PaymentButton({
 export function RazorpayPaymentButton(props: PaymentButtonProps) {
   return <PaymentButton {...props} />;
 }
+
+export default PaymentButton;
+

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { ArrowRight, Sparkles, Layers, Search } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export function Navbar() {
   return (
@@ -17,11 +17,8 @@ export function Navbar() {
         </Link>
         
         <div className="hidden lg:flex gap-6 items-center">
-          <Link href="/modules" className="inline-flex items-center text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all">
-            <Layers className="w-3.5 h-3.5 mr-1.5" /> All 47 Modules
-          </Link>
           <Link href="/pricing" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
-            Pricing & Plans
+            Pricing &amp; Plans
           </Link>
           <Link href="/client/dashboard" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
             Customer Portal
@@ -33,14 +30,11 @@ export function Navbar() {
             Admin Panel
           </Link>
           <Link href="/faq" className="text-xs font-semibold text-gray-300 hover:text-emerald-400 transition-colors">
-            FAQ & Docs
+            FAQ &amp; Docs
           </Link>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Link href="/modules" className="flex lg:hidden text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <Layers className="w-3.5 h-3.5 mr-1" /> All 47
-          </Link>
           <ThemeToggle />
           <Link href="/login">
             <Button variant="ghost" size="sm" className="text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/5">

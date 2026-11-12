@@ -1,20 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  Briefcase, 
-  Building2, 
-  User, 
-  ShieldCheck, 
-  ArrowRight, 
-  CheckCircle2, 
-  Sparkles,
-  Users
+import {
+  Briefcase,
+  Building2,
+  User,
+  ArrowRight,
+  CheckCircle2,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
@@ -25,7 +21,6 @@ type RoleOption = {
   description: string;
   features: string[];
   icon: React.ElementType;
-  route: string;
 };
 
 const ROLES: RoleOption[] = [
@@ -33,160 +28,150 @@ const ROLES: RoleOption[] = [
     id: 'ca',
     title: 'Chartered Accountant (CA)',
     badge: 'Service Provider',
-    description: 'For certified CAs & tax professionals managing multiple client compliance portfolios.',
+    description:
+      'For certified CAs & tax professionals managing multiple client compliance portfolios.',
     features: [
       'Client CRM & Project Management',
       'Automated GST & ITR Filing Workflows',
       'Digital Signatures & Document Vault',
-      'Live Video Consultations & Billing'
+      'Live Video Consultations & Billing',
     ],
     icon: Briefcase,
-    route: '/ca/dashboard'
   },
   {
     id: 'client_business',
     title: 'Business / Enterprise Client',
     badge: 'Company & MSME',
-    description: 'For company directors, CFOs & founders seeking full-spectrum corporate tax & GST compliance.',
+    description:
+      'For company directors, CFOs & founders seeking full-spectrum corporate tax & GST compliance.',
     features: [
       'GSTR-1, 3B & TDS Filing Tracking',
       'Dedicated Assigned CA Workspace',
-      'Bank Statement OCR & Bookkeeping',
-      'Audit Trail & Statutory Reports'
+      'Statement Vault & Bookkeeping',
+      'Audit Trail & Statutory Reports',
     ],
     icon: Building2,
-    route: '/client/dashboard'
   },
   {
     id: 'client_individual',
     title: 'Individual Taxpayer',
     badge: 'Personal Finance',
-    description: 'For salaried employees, freelancers, and investors filing ITR-1 to ITR-4 effortlessly.',
+    description:
+      'For salaried employees, freelancers, and investors filing ITR-1 to ITR-4 effortlessly.',
     features: [
-      'Form 16 & Capital Gains Auto-Import',
+      'Form 16 & Capital Gains Vault',
       'New vs Old Regime Tax Optimizer',
       '1-on-1 CA Tax Consultations',
-      'Notice Handling & Refund Tracking'
+      'Notice Handling & Refund Tracking',
     ],
     icon: User,
-    route: '/client/dashboard'
   },
   {
     id: 'firm_admin',
-    title: 'CA Firm / Partner Admin',
-    badge: 'Multi-Tenant Firm',
-    description: 'For CA firm partners managing staff accountants, multi-branch operations, and firm revenue.',
+    title: 'CA Firm / Practice Staff',
+    badge: 'Multi-Client Team',
+    description:
+      'For CA firm teams collaborating on client returns, compliance schedules, and invoicing.',
     features: [
       'Team & Staff Workload Allocation',
-      'Consolidated Billing & Escrow Payouts',
-      'White-Label Client Portal & Domain',
-      'Enterprise Audit Logging'
+      'Consolidated Billing & Settlements',
+      'Shared Client Portal & Vault',
+      'Enterprise Audit Logging',
     ],
     icon: Users,
-    route: '/ca/dashboard'
-  }
+  },
 ];
 
 export default function ChooseRolePage() {
   const router = useRouter();
-  const [selectedRole, setSelectedRole] = useState<string>('ca');
+  const [selectedRole, setSelectedRole] = useState<string>('client_individual');
   const [loading, setLoading] = useState<boolean>(false);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     setLoading(true);
-    const role = ROLES.find(r => r.id === selectedRole);
-    toast.success(`Role set as ${role?.title}!`);
-    setTimeout(() => {
+    try {
+      const role = ROLES.find((r) => r.id === selectedRole);
+      await fetch('/api/v1/onboarding', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          step: 1,
+          preferences: { selectedWorkspaceProfile: selectedRole },
+          interests: role ? [role.title] : [],
+          completed: false,
+        }),
+      }).catch(() => {});
+
+      toast.success(`Workspace tailored for ${role?.title || selectedRole}.`);
       router.push('/accept-terms');
-    }, 600);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-6 px-4">
-      <div className="text-center space-y-2 mb-8">
-        <Badge className="bg-lime-600/10 text-lime-700 dark:text-lime-400 border-lime-600/20 text-xs font-semibold px-3 py-1">
-          Account Personalization
+    <div className="w-full max-w-4xl mx-auto py-4">
+      <div className="text-center space-y-2 mb-6">
+        <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs font-semibold px-3 py-1">
+          Workspace Setup
         </Badge>
-        <h1 className="text-3xl sm:text-4xl font-extrabold font-display text-slate-900 dark:text-white">
-          Choose Your TaxMate Workspace Role
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+          Choose Your TaxMate Role
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto">
-          We will tailor your dashboards, compliance calendars, and automated tax tools based on how you plan to use TaxMate.
+        <p className="text-xs sm:text-sm text-gray-400 max-w-lg mx-auto">
+          Select the focus area that best matches how you use TaxMate.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {ROLES.map((role) => {
           const Icon = role.icon;
-          const isSelected = selectedRole === role.id;
-
+          const active = selectedRole === role.id;
           return (
-            <div
+            <button
               key={role.id}
+              type="button"
               onClick={() => setSelectedRole(role.id)}
-              className={`cursor-pointer rounded-3xl p-6 border-2 transition-all relative flex flex-col justify-between ${
-                isSelected
-                  ? 'border-lime-600 bg-lime-600/5 dark:bg-lime-950/20 shadow-md shadow-lime-600/10'
-                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+              className={`text-left p-5 rounded-2xl border transition-all ${
+                active
+                  ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_24px_rgba(16,185,129,0.18)]'
+                  : 'bg-[#111111]/90 border-white/10 hover:border-white/25'
               }`}
             >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-colors ${
-                    isSelected 
-                      ? 'bg-lime-600 text-white shadow-md shadow-lime-600/30' 
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                  }`}>
-                    <Icon className="w-5 h-5" />
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                    <Icon className="w-4 h-4" />
                   </div>
-                  <Badge variant="outline" className={`text-[10px] font-bold ${
-                    isSelected ? 'border-lime-600 text-lime-700 dark:text-lime-400' : 'border-slate-200 dark:border-slate-800 text-slate-500'
-                  }`}>
-                    {role.badge}
-                  </Badge>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">{role.title}</h3>
+                    <span className="text-[11px] text-emerald-400">{role.badge}</span>
+                  </div>
                 </div>
-
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    {role.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {role.description}
-                  </p>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-1.5">
-                  {role.features.map((feat, idx) => (
-                    <div key={idx} className="flex items-center text-[11px] text-slate-600 dark:text-slate-400 gap-1.5">
-                      <CheckCircle2 className={`w-3.5 h-3.5 ${isSelected ? 'text-lime-600' : 'text-slate-400'}`} />
-                      <span>{feat}</span>
-                    </div>
-                  ))}
-                </div>
+                {active && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
               </div>
-
-              <div className="mt-4 pt-3 flex justify-end">
-                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                  isSelected ? 'border-lime-600 bg-lime-600 text-white' : 'border-slate-300 dark:border-slate-700'
-                }`}>
-                  {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
-                </div>
-              </div>
-            </div>
+              <p className="text-xs text-gray-400 mb-3">{role.description}</p>
+              <ul className="space-y-1">
+                {role.features.map((f, i) => (
+                  <li key={i} className="text-[11px] text-gray-300 flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-emerald-400" /> {f}
+                  </li>
+                ))}
+              </ul>
+            </button>
           );
         })}
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-        <span className="text-xs text-slate-500">
-          Selected workspace: <strong className="text-slate-800 dark:text-slate-200">{ROLES.find(r => r.id === selectedRole)?.title}</strong>
-        </span>
+      <div className="flex justify-end">
         <Button
           onClick={handleContinue}
           disabled={loading}
-          className="w-full sm:w-auto bg-lime-600 hover:bg-lime-500 text-white font-bold text-xs rounded-xl px-8 py-5 shadow-md shadow-lime-600/30"
+          className="h-11 px-6 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl"
         >
-          {loading ? 'Configuring Role...' : 'Continue to Terms Agreement'} <ArrowRight className="w-4 h-4 ml-1.5" />
+          {loading ? 'Saving...' : 'Continue'}
+          <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
     </div>

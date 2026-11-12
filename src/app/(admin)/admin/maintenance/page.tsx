@@ -1,110 +1,156 @@
 'use client';
 
-import React, { useState } from 'react';
-import { 
-  Wrench, 
-  ShieldAlert, 
-  Save, 
-  Key, 
-  Mail, 
-  CheckCircle2, 
-  AlertCircle 
-} from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Wrench, Power, Mail, Loader2, RefreshCw, Save } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
-export default function MaintenanceAdminPage() {
-  const [isMaintenance, setIsMaintenance] = useState(false);
-  const [message, setMessage] = useState('We are performing scheduled maintenance on TaxMate. We will be back shortly.');
-  const [bypassKey, setBypassKey] = useState('taxmate-secret-bypass-2026');
-  const [estimatedEnd, setEstimatedEnd] = useState('2026-07-22T02:00:00');
-  const [savedSuccess, setSavedSuccess] = useState(false);
+export default function AdminMaintenancePage() {
+  const [enabled, setEnabled] = useState(false);
+  const [title, setTitle] = useState('Scheduled Platform Upgrade');
+  const [message, setMessage] = useState('');
+  const [estimatedResumeAt, setEstimatedResumeAt] = useState('');
+  const [subscribers, setSubscribers] = useState<Array<{ id: string; email: string; subscribed_at: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+  const loadConfig = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/overview?section=maintenance', { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to load maintenance state');
+      setEnabled(Boolean(json.config?.enabled));
+      setTitle(json.config?.title || 'Scheduled Platform Upgrade');
+      setMessage(json.config?.message || '');
+      setEstimatedResumeAt(json.config?.estimatedResumeAt || '');
+      setSubscribers(Array.isArray(json.subscribers) ? json.subscribers : []);
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to load maintenance configuration');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
+
+  const handleSave = async (nextEnabled = enabled) => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/overview', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          section: 'maintenance',
+          enabled: nextEnabled,
+          title,
+          message,
+          estimatedResumeAt,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to save maintenance settings');
+      setEnabled(Boolean(json.config?.enabled));
+      toast.success(nextEnabled ? 'Maintenance mode enabled' : 'Maintenance settings saved');
+    } catch (err: any) {
+      toast.error(err?.message || 'Update failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-display text-slate-100 flex items-center gap-2">
-          System Maintenance Settings
-          <Badge className="bg-lime-500/20 text-lime-400 border-lime-500/30">Super Admin Control</Badge>
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">Configure global maintenance status, public message banners, and emergency bypass keys.</p>
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <Wrench className="w-6 h-6 text-lime-500" /> Platform Maintenance Control
+          </h1>
+          <p className="text-sm text-slate-400">Persist global maintenance mode banner and notify waitlisted subscribers</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge className={enabled ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-lime-600/20 text-lime-400 border-lime-500/30'}>
+            {enabled ? 'MAINTENANCE ACTIVE' : 'SYSTEM LIVE'}
+          </Badge>
+          <Button variant="outline" size="sm" onClick={loadConfig} className="border-slate-800 bg-slate-900 text-slate-300">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
-      {savedSuccess && (
-        <div className="flex items-center gap-2 p-4 rounded-xl bg-lime-500/10 border border-lime-500/30 text-lime-400 text-sm font-semibold">
-          <CheckCircle2 className="w-5 h-5" /> Maintenance configuration updated successfully!
+      {loading ? (
+        <div className="py-16 flex justify-center text-slate-400 gap-2">
+          <Loader2 className="w-5 h-5 animate-spin text-lime-500" /> Loading system_settings...
         </div>
-      )}
+      ) : (
+        <>
+          <Card className="bg-slate-900 border-slate-800 p-6 space-y-5">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-slate-950 border border-slate-800">
+              <div>
+                <h2 className="font-semibold text-slate-100 text-sm">Global Maintenance Window</h2>
+                <p className="text-xs text-slate-400">Redirects public traffic when `/api/maintenance-check` reports active maintenance</p>
+              </div>
+              <Button
+                disabled={saving}
+                onClick={() => handleSave(!enabled)}
+                className={enabled ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-red-600 hover:bg-red-500 text-white'}
+              >
+                <Power className="w-4 h-4 mr-1.5" /> {enabled ? 'Disable Maintenance' : 'Enable Maintenance'}
+              </Button>
+            </div>
 
-      <Card className="bg-slate-900/50 border-slate-800">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-3 rounded-xl ${isMaintenance ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'}`}>
-                <Wrench className="w-6 h-6" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Notice Title</label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} className="bg-slate-950 border-slate-800 text-slate-100" />
               </div>
               <div>
-                <CardTitle className="text-slate-100">Global Maintenance Mode</CardTitle>
-                <CardDescription className="text-slate-400">When enabled, all non-admin traffic will be redirected to maintenance screen.</CardDescription>
+                <label className="block text-xs text-slate-400 mb-1">Estimated Resume Time</label>
+                <Input value={estimatedResumeAt} onChange={(e) => setEstimatedResumeAt(e.target.value)} placeholder="e.g. 02:00 AM IST" className="bg-slate-950 border-slate-800 text-slate-100" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs text-slate-400 mb-1">Public Status Message</label>
+                <textarea
+                  rows={3}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs text-slate-100"
+                />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">{isMaintenance ? 'ENABLED' : 'DISABLED'}</span>
-              <Switch checked={isMaintenance} onCheckedChange={setIsMaintenance} />
+
+            <div className="flex justify-end">
+              <Button onClick={() => handleSave(enabled)} disabled={saving} className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-semibold">
+                <Save className="w-4 h-4 mr-1.5" /> {saving ? 'Saving...' : 'Save Configuration'}
+              </Button>
             </div>
-          </div>
-        </CardHeader>
+          </Card>
 
-        <CardContent className="space-y-5 pt-2">
-          {/* Public Maintenance Message */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">Maintenance Banner Message</label>
-            <Input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="bg-slate-950 border-slate-800 text-slate-200"
-            />
-          </div>
-
-          {/* Bypass Key */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-lime-400" /> Admin Bypass Secret Key
-            </label>
-            <Input
-              value={bypassKey}
-              onChange={(e) => setBypassKey(e.target.value)}
-              className="bg-slate-950 border-slate-800 text-slate-200 font-mono"
-            />
-            <p className="text-[11px] text-slate-500">Append ?bypass=KEY to URL to bypass maintenance mode during updates.</p>
-          </div>
-
-          {/* Estimated End Time */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">Estimated Completion Time</label>
-            <Input
-              type="datetime-local"
-              value={estimatedEnd}
-              onChange={(e) => setEstimatedEnd(e.target.value)}
-              className="bg-slate-950 border-slate-800 text-slate-200"
-            />
-          </div>
-
-          <div className="pt-4 border-t border-slate-800 flex justify-end">
-            <Button onClick={handleSave} className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-bold px-6">
-              <Save className="w-4 h-4 mr-2" /> Save Maintenance Settings
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <Card className="bg-slate-900 border-slate-800 p-6 space-y-4">
+            <h2 className="font-semibold text-slate-100 text-sm flex items-center gap-2">
+              <Mail className="w-4 h-4 text-lime-500" /> Downtime Notification Subscribers ({subscribers.length})
+            </h2>
+            {subscribers.length === 0 ? (
+              <p className="text-xs text-slate-400">No notification subscribers waiting right now.</p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {subscribers.map((sub) => (
+                  <div key={sub.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                    <span className="text-slate-200 font-mono">{sub.email}</span>
+                    <span className="text-slate-500">{new Date(sub.subscribed_at).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   );
 }

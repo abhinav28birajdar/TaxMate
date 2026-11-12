@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -22,7 +22,8 @@ import {
   MapPin, 
   Check,
   Building2,
-  Calendar
+  Calendar,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -31,33 +32,35 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function CustomerOnboardingWizardPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   // Form states
   const [customerType, setCustomerType] = useState<"salaried" | "freelancer" | "business" | "nri">("salaried");
   
   // Personal & Contact
-  const [fullName, setFullName] = useState("Abhinav Birajdar");
-  const [dob, setDob] = useState("1994-05-15");
-  const [email, setEmail] = useState("abhinav@example.com");
-  const [phone, setPhone] = useState("+91 98210 98210");
-  const [addressLine, setAddressLine] = useState("Flat 402, Lotus Residency");
-  const [city, setCity] = useState("Pune");
-  const [state, setState] = useState("Maharashtra");
-  const [pincode, setPincode] = useState("411038");
+  const [fullName, setFullName] = useState("");
+  const [dob, setDob] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [pincode, setPincode] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   // ID & Bank
-  const [pan, setPan] = useState("AAACT1234F");
-  const [aadhaar, setAadhaar] = useState("•••• •••• 8912");
-  const [bankName, setBankName] = useState("HDFC Bank Ltd");
-  const [accountNumber, setAccountNumber] = useState("50100291823901");
-  const [ifsc, setIfsc] = useState("HDFC0001234");
+  const [pan, setPan] = useState("");
+  const [aadhaar, setAadhaar] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [ifsc, setIfsc] = useState("");
   const [accountType, setAccountType] = useState("Savings Account");
 
   // Employment & Business
-  const [employerName, setEmployerName] = useState("TechNova Solutions Pvt Ltd");
-  const [designation, setDesignation] = useState("Senior Engineering Lead");
-  const [annualCTC, setAnnualCTC] = useState("₹24,50,000");
+  const [employerName, setEmployerName] = useState("");
+  const [designation, setDesignation] = useState("");
+  const [annualCTC, setAnnualCTC] = useState("");
   const [gstin, setGstin] = useState("");
 
   // Tax Profile & Income Sources
@@ -65,22 +68,171 @@ export default function CustomerOnboardingWizardPage() {
     salary: true,
     freelance: false,
     rental: false,
-    interest: true,
-    dividend: true,
-    capitalGains: true,
+    interest: false,
+    dividend: false,
+    capitalGains: false,
   });
   const [previousAYFiled, setPreviousAYFiled] = useState("AY 2025-26 (ITR-1)");
-  const [prevAckNo, setPrevAckNo] = useState("ACK-2025-991823");
-  const [chosenRegime, setChosenRegime] = useState("New Regime (Sec 115BAC)");
+  const [prevAckNo, setPrevAckNo] = useState("");
+  const [chosenRegime, setChosenRegime] = useState("New Regime (Sec 115BAC) - Standard ₹75k Deduction");
 
-  // KYC Uploads
-  const [panUploaded, setPanUploaded] = useState(true);
-  const [aadhaarUploaded, setAadhaarUploaded] = useState(true);
-  const [chequeUploaded, setChequeUploaded] = useState(true);
+  // KYC Confirmation
+  const [panConfirmed, setPanConfirmed] = useState(false);
+  const [aadhaarConfirmed, setAadhaarConfirmed] = useState(false);
+  const [bankConfirmed, setBankConfirmed] = useState(false);
 
-  const handleFinish = () => {
-    toast.success("Welcome to TaxMate! Customer onboarding successfully completed.");
-    router.push("/client/dashboard");
+  useEffect(() => {
+    let active = true;
+    async function hydrate() {
+      try {
+        const [profileRes, onboardingRes] = await Promise.all([
+          fetch("/api/v1/profile"),
+          fetch("/api/v1/onboarding"),
+        ]);
+
+        if (!active) return;
+
+        if (profileRes.ok) {
+          const profileJson = await profileRes.json();
+          const u = profileJson?.data?.user;
+          const p = profileJson?.data?.profile;
+          if (p?.fullName || u?.name) setFullName((prev) => prev || p?.fullName || u?.name || "");
+          if (u?.email) setEmail((prev) => prev || u.email);
+          if (p?.phone) setPhone((prev) => prev || p.phone);
+        }
+
+        if (onboardingRes.ok) {
+          const obJson = await onboardingRes.json();
+          const ob = obJson?.data?.onboarding;
+          const info = (ob?.basic_info || {}) as Record<string, any>;
+          const prefs = (ob?.preferences || {}) as Record<string, any>;
+
+          if (info.customerType) setCustomerType(info.customerType);
+          if (info.fullName) setFullName(info.fullName);
+          if (info.dob) setDob(info.dob);
+          if (info.phone) setPhone(info.phone);
+          if (info.addressLine) setAddressLine(info.addressLine);
+          if (info.city) setCity(info.city);
+          if (info.state) setState(info.state);
+          if (info.pincode) setPincode(info.pincode);
+          if (info.pan) {
+            setPan(info.pan);
+            setPanConfirmed(true);
+          }
+          if (info.aadhaar) {
+            setAadhaar(info.aadhaar);
+            setAadhaarConfirmed(true);
+          }
+          if (info.bankName) setBankName(info.bankName);
+          if (info.accountNumber) {
+            setAccountNumber(info.accountNumber);
+            setBankConfirmed(true);
+          }
+          if (info.ifsc) setIfsc(info.ifsc);
+          if (info.accountType) setAccountType(info.accountType);
+          if (info.employerName) setEmployerName(info.employerName);
+          if (info.designation) setDesignation(info.designation);
+          if (info.annualCTC) setAnnualCTC(info.annualCTC);
+          if (info.gstin) setGstin(info.gstin);
+
+          if (prefs.incomeSources) setIncomeSources((prev) => ({ ...prev, ...prefs.incomeSources }));
+          if (prefs.previousAYFiled) setPreviousAYFiled(prefs.previousAYFiled);
+          if (prefs.prevAckNo) setPrevAckNo(prefs.prevAckNo);
+          if (prefs.chosenRegime) setChosenRegime(prefs.chosenRegime);
+        }
+      } catch {
+        // Non-blocking hydration
+      } finally {
+        if (active) setLoadingProfile(false);
+      }
+    }
+    hydrate();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleFinish = async () => {
+    if (!fullName.trim()) {
+      toast.error("Please provide your full legal name before completing onboarding.");
+      setCurrentStep(2);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const selectedInterests = Object.entries(incomeSources)
+        .filter(([, enabled]) => enabled)
+        .map(([key]) => key);
+
+      const profileRes = await fetch("/api/v1/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          phone: phone.trim() || undefined,
+        }),
+      });
+
+      if (!profileRes.ok) {
+        const err = await profileRes.json().catch(() => ({}));
+        throw new Error(err?.message || "Failed to update profile");
+      }
+
+      const obRes = await fetch("/api/v1/onboarding", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: 6,
+          completed: true,
+          interests: selectedInterests,
+          basicInfo: {
+            customerType,
+            fullName: fullName.trim(),
+            dob,
+            email: email.trim(),
+            phone: phone.trim(),
+            addressLine,
+            city,
+            state,
+            pincode,
+            pan: pan.trim().toUpperCase(),
+            aadhaar: aadhaar.trim(),
+            bankName,
+            accountNumber,
+            ifsc: ifsc.trim().toUpperCase(),
+            accountType,
+            employerName,
+            designation,
+            annualCTC,
+            gstin: gstin.trim().toUpperCase(),
+          },
+          preferences: {
+            incomeSources,
+            previousAYFiled,
+            prevAckNo,
+            chosenRegime,
+            kycConfirmed: {
+              pan: panConfirmed,
+              aadhaar: aadhaarConfirmed,
+              bank: bankConfirmed,
+            },
+          },
+        }),
+      });
+
+      if (!obRes.ok) {
+        const err = await obRes.json().catch(() => ({}));
+        throw new Error(err?.message || "Failed to save onboarding details");
+      }
+
+      toast.success("Welcome to TaxMate! Your onboarding profile has been saved.");
+      router.push("/portal/dashboard");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not complete onboarding.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const stepsList = [
@@ -182,17 +334,24 @@ export default function CustomerOnboardingWizardPage() {
                 )}
               </div>
               <div>
-                <Button 
-                  onClick={() => {
-                    setAvatarPreview("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop");
-                    toast.success("Profile photo uploaded!");
-                  }}
-                  variant="outline" 
-                  size="sm" 
-                  className="text-xs border-white/10 text-gray-300 rounded-xl"
-                >
+                <label className="inline-flex items-center justify-center px-3 py-1.5 text-xs border border-white/10 text-gray-300 rounded-xl cursor-pointer hover:bg-white/5 transition">
                   Upload Profile Photo
-                </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 5 * 1024 * 1024) {
+                        toast.error("Please select an image smaller than 5MB.");
+                        return;
+                      }
+                      setAvatarPreview(URL.createObjectURL(file));
+                      toast.success("Profile photo selected!");
+                    }}
+                  />
+                </label>
                 <p className="text-[10px] text-gray-500 mt-1">JPEG or PNG format up to 5MB</p>
               </div>
             </div>
@@ -521,68 +680,100 @@ export default function CustomerOnboardingWizardPage() {
           </motion.div>
         )}
 
-        {/* STEP 6: KYC Upload & Onboarding Complete */}
+        {/* STEP 6: KYC Confirmation & Onboarding Complete */}
         {currentStep === 6 && (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-white">KYC Upload & Verification Review</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Automated OCR cross-reference with Income Tax Department records.</p>
+              <h2 className="text-xl font-bold text-white">KYC Confirmation & Profile Review</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Verify your submitted tax identity details before opening your portal. You can upload supporting documents in the Vault at any time.</p>
             </div>
 
-            <div className="space-y-2.5 text-xs">
-              <div className="p-3.5 rounded-xl bg-[#181818] border border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-emerald-400" />
-                  <div>
-                    <div className="font-semibold text-white">PAN Card Original Copy</div>
-                    <div className="text-[10px] text-gray-400">AAACT1234F • Cryptographic checksum OK</div>
-                  </div>
-                </div>
-                <span className="text-emerald-400 font-bold text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  VERIFIED
-                </span>
+            {loadingProfile ? (
+              <div className="p-6 rounded-xl bg-[#181818] border border-white/5 flex items-center justify-center gap-2 text-xs text-gray-400">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" /> Loading saved profile...
               </div>
+            ) : (
+              <div className="space-y-2.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPanConfirmed((prev) => !prev)}
+                  className="w-full text-left p-3.5 rounded-xl bg-[#181818] border border-white/10 hover:border-emerald-500/30 flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <div className="font-semibold text-white">PAN Identity Details</div>
+                      <div className="text-[10px] text-gray-400">
+                        {pan ? `${pan.toUpperCase()} • Ready for e-Filing verification` : "No PAN entered yet (click to confirm deferred entry)"}
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`font-bold text-[10px] px-2.5 py-0.5 rounded-full border ${panConfirmed || pan ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border-amber-500/20"}`}>
+                    {panConfirmed ? "CONFIRMED" : pan ? "PROVIDED" : "OPTIONAL"}
+                  </span>
+                </button>
 
-              <div className="p-3.5 rounded-xl bg-[#181818] border border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-emerald-400" />
-                  <div>
-                    <div className="font-semibold text-white">Aadhaar e-KYC Offline XML</div>
-                    <div className="text-[10px] text-gray-400">UIDAI timestamped • Demographic match 100%</div>
+                <button
+                  type="button"
+                  onClick={() => setAadhaarConfirmed((prev) => !prev)}
+                  className="w-full text-left p-3.5 rounded-xl bg-[#181818] border border-white/10 hover:border-emerald-500/30 flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <div className="font-semibold text-white">Aadhaar Reference</div>
+                      <div className="text-[10px] text-gray-400">
+                        {aadhaar ? `Ending ${aadhaar.slice(-4)} • Required for Aadhaar OTP e-Verify` : "Can be linked later during ITR verification"}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <span className="text-emerald-400 font-bold text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  VERIFIED
-                </span>
-              </div>
+                  <span className={`font-bold text-[10px] px-2.5 py-0.5 rounded-full border ${aadhaarConfirmed || aadhaar ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border-amber-500/20"}`}>
+                    {aadhaarConfirmed ? "CONFIRMED" : aadhaar ? "PROVIDED" : "OPTIONAL"}
+                  </span>
+                </button>
 
-              <div className="p-3.5 rounded-xl bg-[#181818] border border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-emerald-400" />
-                  <div>
-                    <div className="font-semibold text-white">HDFC Bank Cancelled Cheque</div>
-                    <div className="text-[10px] text-gray-400">Penny-drop verified with account holder name</div>
+                <button
+                  type="button"
+                  onClick={() => setBankConfirmed((prev) => !prev)}
+                  className="w-full text-left p-3.5 rounded-xl bg-[#181818] border border-white/10 hover:border-emerald-500/30 flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <div className="font-semibold text-white">Refund Bank Account</div>
+                      <div className="text-[10px] text-gray-400">
+                        {bankName ? `${bankName}${accountNumber ? ` • A/C ending ${accountNumber.slice(-4)}` : ""}` : "Add refund account details anytime in Settings"}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <span className="text-emerald-400 font-bold text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  VERIFIED
-                </span>
+                  <span className={`font-bold text-[10px] px-2.5 py-0.5 rounded-full border ${bankConfirmed || (bankName && accountNumber) ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border-amber-500/20"}`}>
+                    {bankConfirmed ? "CONFIRMED" : bankName && accountNumber ? "PROVIDED" : "OPTIONAL"}
+                  </span>
+                </button>
               </div>
-            </div>
+            )}
 
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs space-y-1">
               <div className="font-bold text-emerald-400 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" /> Ready for Automated ITR-1 / ITR-2 Filings
+                <ShieldCheck className="w-4 h-4" /> Ready for TaxMate Client Portal
               </div>
               <p className="text-emerald-300 text-[11px] leading-relaxed">
-                Your profile is 100% complete and verified. A dedicated Chartered Accountant has been mapped to your docket.
+                {fullName ? `${fullName}'s profile` : "Your tax profile"} will be persisted to Supabase and made available to your assigned Chartered Accountant.
               </p>
             </div>
 
             <div className="flex justify-between pt-2">
-              <Button variant="ghost" onClick={() => setCurrentStep(5)} className="text-xs text-gray-400">Back</Button>
-              <Button onClick={handleFinish} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl px-6 shadow-[0_0_20px_rgba(5,150,105,0.4)]">
-                Complete Onboarding & Open Dashboard <ArrowRight className="w-4 h-4 ml-1.5" />
+              <Button variant="ghost" onClick={() => setCurrentStep(5)} disabled={submitting} className="text-xs text-gray-400">Back</Button>
+              <Button onClick={handleFinish} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl px-6 shadow-[0_0_20px_rgba(5,150,105,0.4)]">
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Saving Profile...
+                  </>
+                ) : (
+                  <>
+                    Complete Onboarding & Open Dashboard <ArrowRight className="w-4 h-4 ml-1.5" />
+                  </>
+                )}
               </Button>
             </div>
           </motion.div>

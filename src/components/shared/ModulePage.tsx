@@ -19,6 +19,15 @@ export function ModulePage({
   const basePath = portal === "Customer" ? "/client" : portal === "CA" ? "/ca" : portal === "Admin" ? "/admin" : "/";
   const isList = /dashboard|documents|tasks|clients|messages|notifications|reports|returns|payments|invoices|appointments|settings|support/i.test(title);
 
+  const createHref =
+    portal === "Customer"
+      ? "/client/documents/upload"
+      : portal === "CA"
+      ? "/ca/clients/add"
+      : portal === "Admin"
+      ? "/admin/users"
+      : "/register";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -29,7 +38,11 @@ export function ModulePage({
             Manage this part of your TaxMate workspace with secure, firm-scoped records.
           </p>
         </div>
-        {isList && <Button><Plus className="mr-2 h-4 w-4" />Create new</Button>}
+        {isList && (
+          <Link href={createHref}>
+            <Button><Plus className="mr-2 h-4 w-4" />Create new</Button>
+          </Link>
+        )}
       </div>
 
       <Card className="border-primary/20 bg-primary/[0.04]">

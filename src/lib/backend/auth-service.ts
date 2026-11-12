@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import * as bcrypt from 'bcryptjs'
+import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { env } from './env'
 import { AppError, conflict, unauthorized, notFound, internalError } from './errors'
 import { signAccessToken } from './jwt'
@@ -7,6 +8,9 @@ import { logActivity } from './audit'
 
 let _supabaseAdmin: any = null;
 const getSupabaseAdmin = () => {
+  if (typeof window !== 'undefined') {
+    throw new Error('Backend auth service cannot run in browser runtime.');
+  }
   if (!_supabaseAdmin) {
     _supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '');
   }
@@ -256,14 +260,16 @@ export async function logout(userId: string, sessionId?: string): Promise<void> 
 }
 
 /**
- * Create Password Reset: Generate reset token
+ * Create Password Reset: Generate hashed reset token and dispatch email if configured.
+ * Never logs or stores plaintext reset tokens.
  */
 export async function createPasswordReset(email: string): Promise<string> {
   try {
+    const normalizedEmail = email.toLowerCase().trim()
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('id')
-      .eq('email', email.toLowerCase())
+      .select('id, email, name, metadata')
+      .eq('email', normalizedEmail)
       .maybeSingle()
 
     if (!user) {
@@ -271,25 +277,45 @@ export async function createPasswordReset(email: string): Promise<string> {
       return 'password-reset-sent'
     }
 
-    // Generate a secure reset token
-    const resetToken = crypto.randomUUID()
-    const tokenHash = await bcrypt.hash(resetToken, 10)
+    const resetToken = randomBytes(32).toString('hex')
+    const tokenHash = createHash('sha256').update(resetToken).digest('hex')
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+    const existingMeta = (user.metadata && typeof user.metadata === 'object') ? user.metadata : {}
 
     await supabaseAdmin
       .from('users')
       .update({
         metadata: {
-          reset_token: tokenHash,
+          ...existingMeta,
+          reset_token_hash: tokenHash,
           reset_token_expires_at: expiresAt.toISOString(),
-          reset_token_plain: resetToken,
         },
       })
       .eq('id', user.id)
 
-    console.log(`Reset token for ${email}: ${resetToken}`)
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const { Resend } = await import('resend')
+        const resend = new Resend(process.env.RESEND_API_KEY)
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`
+        await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL || 'TaxMate <noreply@taxmate.in>',
+          to: [user.email],
+          subject: 'Reset your TaxMate password',
+          html: `<p>Hello ${user.name || 'User'},</p><p>Use the link below to reset your password (valid for 1 hour):</p><p><a href="${resetUrl}">Reset Password</a></p>`,
+        })
+      } catch (emailErr) {
+        console.warn('Password reset email dispatch skipped/failed:', emailErr)
+      }
+    }
 
-    return resetToken
+    await logActivity({
+      userId: user.id,
+      action: 'password_reset_requested',
+    })
+
+    return 'password-reset-sent'
   } catch (error) {
     console.error('Forgot password error:', error)
     throw internalError('Failed to process password reset request')
@@ -297,54 +323,62 @@ export async function createPasswordReset(email: string): Promise<string> {
 }
 
 /**
- * Reset Password: Verify token and update password
+ * Reset Password: Verify SHA-256 token hash and update password
  */
 export async function resetPassword(token: string, newPassword: string): Promise<void> {
   try {
-    // Find user by checking for matching reset token
+    if (!token || token.length < 16) {
+      throw new AppError('Invalid or expired reset token', 400, 'INVALID_TOKEN')
+    }
+
+    const candidateHash = createHash('sha256').update(token).digest('hex')
     const { data: users } = await supabaseAdmin
       .from('users')
       .select('id, metadata')
       .not('metadata', 'is', null)
 
-    let user = null
+    let matchedUser: any = null
+    const candidateBuf = new Uint8Array(Buffer.from(candidateHash, 'utf8'))
     for (const u of users || []) {
-      const meta = u.metadata as any
-      if (meta?.reset_token_plain === token) {
-        // Verify token hasn't expired
-        if (new Date(meta.reset_token_expires_at) > new Date()) {
-          user = u
+      const meta = (u.metadata && typeof u.metadata === 'object') ? (u.metadata as Record<string, any>) : null
+      const storedHash = typeof meta?.reset_token_hash === 'string' ? meta.reset_token_hash : ''
+      if (!storedHash || storedHash.length !== candidateHash.length) continue
+      const storedBuf = new Uint8Array(Buffer.from(storedHash, 'utf8'))
+      if (timingSafeEqual(storedBuf, candidateBuf)) {
+        if (meta?.reset_token_expires_at && new Date(meta.reset_token_expires_at) > new Date()) {
+          matchedUser = u
           break
         }
       }
     }
 
-    if (!user) {
+    if (!matchedUser) {
       throw new AppError('Invalid or expired reset token', 400, 'INVALID_TOKEN')
     }
 
-    // Hash new password
     const newPasswordHash = await bcrypt.hash(newPassword, env.BCRYPT_SALT_ROUNDS)
+    const cleanedMeta: Record<string, any> = { ...((matchedUser.metadata as Record<string, any>) || {}) }
+    delete cleanedMeta.reset_token_hash
+    delete cleanedMeta.reset_token_expires_at
+    delete cleanedMeta.reset_token
+    delete cleanedMeta.reset_token_plain
 
-    // Update password
     await supabaseAdmin
       .from('users')
       .update({
         password_hash: newPasswordHash,
-        metadata: null, // Clear reset token
+        metadata: cleanedMeta,
       })
-      .eq('id', user.id)
+      .eq('id', matchedUser.id)
 
-    // Revoke all sessions
     await supabaseAdmin
       .from('user_sessions')
       .update({ active: false })
-      .eq('user_id', user.id)
+      .eq('user_id', matchedUser.id)
       .eq('active', true)
 
-    // Log activity
     await logActivity({
-      userId: user.id,
+      userId: matchedUser.id,
       action: 'password_reset',
     })
   } catch (error) {

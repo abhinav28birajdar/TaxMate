@@ -41,12 +41,12 @@ export default function NotFoundPage() {
             <p className="text-[11px] text-gray-400 mt-1">Clients, Returns & Tax Filings</p>
           </Link>
 
-          <Link href="/modules" className="p-4 bg-[#18181b] hover:bg-[#202024] border border-white/10 hover:border-emerald-500/40 rounded-xl text-left transition-all group">
+          <Link href="/features" className="p-4 bg-[#18181b] hover:bg-[#202024] border border-white/10 hover:border-emerald-500/40 rounded-xl text-left transition-all group">
             <div className="flex items-center justify-between text-xs font-bold text-white">
-              <span className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-emerald-400" /> All 20 Modules</span>
+              <span className="flex items-center gap-1.5"><Layers className="w-3.5 h-3.5 text-emerald-400" /> Platform Features</span>
               <Sparkles className="w-4 h-4 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">Explore complete TaxMate system</p>
+            <p className="text-[11px] text-gray-400 mt-1">Explore complete TaxMate capabilities</p>
           </Link>
         </div>
 

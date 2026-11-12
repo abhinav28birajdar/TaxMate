@@ -22,13 +22,11 @@ import {
   Bookmark,
   HelpCircle,
   ShieldCheck,
-  FileSpreadsheet,
-  Layers
+  FileSpreadsheet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "All 47 Modules", href: "/modules", icon: Layers, highlight: true },
   { name: "Dashboard", href: "/client/dashboard", icon: LayoutDashboard },
   { name: "My CA", href: "/client/my-ca", icon: User },
   { name: "Find & Hire a CA", href: "/client/find-ca", icon: Search },
@@ -70,7 +68,7 @@ export function ClientSidebar() {
       <div className="flex flex-1 flex-col overflow-y-auto pt-3 pb-6">
         <nav className="flex-1 space-y-1 px-3">
           {navigation.map((item) => {
-            const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/client/dashboard" && item.href !== "/modules");
+            const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/client/dashboard");
             return (
               <Link
                 key={item.name}
@@ -78,25 +76,18 @@ export function ClientSidebar() {
                 className={cn(
                   isActive
                     ? "bg-emerald-500/10 text-emerald-400 font-semibold border-l-4 border-emerald-500 pl-2 shadow-[inset_0_0_12px_rgba(16,185,129,0.1)]"
-                    : item.highlight
-                    ? "text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20"
                     : "text-gray-400 hover:bg-[#141414] hover:text-white",
                   "group flex items-center rounded-xl px-3 py-2 text-xs font-medium transition-all"
                 )}
               >
                 <item.icon
                   className={cn(
-                    isActive ? "text-emerald-400" : item.highlight ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300",
+                    isActive ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300",
                     "mr-3 h-4 w-4 shrink-0 transition-colors"
                   )}
                   aria-hidden="true"
                 />
                 <span className="truncate">{item.name}</span>
-                {item.highlight && (
-                  <span className="ml-auto text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
-                    Hub
-                  </span>
-                )}
               </Link>
             );
           })}

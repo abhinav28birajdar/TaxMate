@@ -16,7 +16,14 @@ export async function GET(request: Request) {
 
             if (!redirectPath) {
                 const { data } = await supabase.auth.getUser()
-                redirectPath = getDashboardPathForRole(normalizeRole(data.user?.app_metadata?.role || null))
+                const role = normalizeRole(
+                    data.user?.app_metadata?.role ||
+                    data.user?.app_metadata?.user_role ||
+                    data.user?.user_metadata?.role ||
+                    data.user?.user_metadata?.user_role ||
+                    null
+                );
+                redirectPath = getDashboardPathForRole(role);
             }
 
             return NextResponse.redirect(`${origin}${redirectPath || '/landing'}`)

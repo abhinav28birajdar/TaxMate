@@ -63,15 +63,16 @@ export async function requirePermission(userId: string, resource: string, action
 
 // Helper function for checking roles synchronously in API routes
 export function ensureRole(userRole: string | string[], allowedRoles: string[]): void {
-  const roles = Array.isArray(userRole) ? userRole : [userRole];
-  const hasRequiredRole = roles.some((role) =>
-    allowedRoles.some(
-      (allowed) =>
-        role.toUpperCase() === allowed.toUpperCase() ||
-        role.toLowerCase() === allowed.toLowerCase() ||
-        role === allowed
-    )
-  );
+  const roles = (Array.isArray(userRole) ? userRole : [userRole]).map((r) => String(r).toUpperCase());
+  const normalizedAllowed = allowedRoles.map((a) => {
+    const upper = String(a).toUpperCase();
+    return upper === 'ADMIN' ? 'SUPER_ADMIN' : upper;
+  });
+
+  const hasRequiredRole = roles.some((role) => {
+    const canonical = role === 'ADMIN' ? 'SUPER_ADMIN' : role;
+    return normalizedAllowed.includes(canonical) || allowedRoles.some((a) => a.toUpperCase() === role);
+  });
 
   if (!hasRequiredRole) {
     throw forbidden(`Requires one of these roles: ${allowedRoles.join(', ')}`);
@@ -80,10 +81,10 @@ export function ensureRole(userRole: string | string[], allowedRoles: string[]):
 
 export async function isAdmin(userId: string): Promise<boolean> {
   const roles = await getUserRoles(userId);
-  return roles.includes('SUPER_ADMIN') || roles.includes('CA');
+  return roles.some((r) => ['SUPER_ADMIN', 'ADMIN'].includes(String(r).toUpperCase()));
 }
 
 export async function isSuperAdmin(userId: string): Promise<boolean> {
   const roles = await getUserRoles(userId);
-  return roles.includes('SUPER_ADMIN');
+  return roles.some((r) => String(r).toUpperCase() === 'SUPER_ADMIN');
 }

@@ -2,7 +2,13 @@ import { jwtVerify, SignJWT, errors } from 'jose';
 import { env } from './env';
 import { unauthorized } from './errors';
 
-const secret = new TextEncoder().encode(env.JWT_SECRET ?? '');
+const getSecretBytes = () => {
+  const raw = env.JWT_SECRET || process.env.JWT_SECRET || '';
+  if (!raw || raw.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters');
+  }
+  return new TextEncoder().encode(raw);
+};
 
 export interface JWTPayload {
   userId: string;
@@ -29,7 +35,7 @@ export async function signAccessToken(payload: {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('15m')
-      .sign(secret);
+      .sign(getSecretBytes());
 
     return token;
   } catch (error) {
@@ -40,7 +46,7 @@ export async function signAccessToken(payload: {
 
 export async function verifyAccessToken(token: string): Promise<JWTPayload> {
   try {
-    const verified = await jwtVerify(token, secret);
+    const verified = await jwtVerify(token, getSecretBytes());
     return verified.payload as unknown as JWTPayload;
   } catch (error) {
     if (error instanceof errors.JWTClaimValidationFailed) {

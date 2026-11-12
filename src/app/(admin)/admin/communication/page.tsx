@@ -1,130 +1,175 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { 
-  Megaphone, 
-  Send, 
-  Bell, 
-  MessageSquare, 
-  AlertTriangle, 
-  UserX, 
-  CheckCircle2, 
-  Filter, 
-  Mail, 
-  Plus
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import React, { useCallback, useEffect, useState } from 'react';
+import { MessageSquare, Send, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+
+interface InquiryItem {
+  id: string;
+  inquiry_type: string;
+  name: string;
+  email: string;
+  subject: string | null;
+  message: string;
+  status: string;
+  created_at: string;
+}
 
 export default function AdminCommunicationPage() {
-  const [announcementText, setAnnouncementText] = useState("");
-  const [broadcastTarget, setBroadcastTarget] = useState("all");
+  const [inquiries, setInquiries] = useState<InquiryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [broadcastTitle, setBroadcastTitle] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [targetRole, setTargetRole] = useState('ALL');
+  const [sending, setSending] = useState(false);
 
-  const reports = [
-    { id: "rep-1", reportedUser: "Spam Profile (Fake CA)", reportedBy: "Dr. Vikramaditya Rao", reason: "Unsolicited promotional WhatsApp messages for crypto", date: "Yesterday", status: "Account Suspended" },
-    { id: "rep-2", reportedUser: "Client User #4910", reportedBy: "CA Rajesh Sharma, FCA", reason: "Abusive language in consultation chat", date: "3 days ago", status: "Warning Issued" }
-  ];
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/overview?section=communication', { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to load inquiries');
+      setInquiries(Array.isArray(json.items) ? json.items : []);
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to load communications');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleBroadcast = (e: React.FormEvent) => {
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!announcementText.trim()) return;
-    toast.success(`Platform announcement broadcasted to ${broadcastTarget.toUpperCase()} users!`);
-    setAnnouncementText("");
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) {
+      toast.error('Provide notification title and message.');
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch('/api/admin/overview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          section: 'broadcast',
+          title: broadcastTitle.trim(),
+          message: broadcastMessage.trim(),
+          targetRole,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Broadcast failed');
+      setBroadcastTitle('');
+      setBroadcastMessage('');
+      toast.success(`Notification broadcast delivered to ${json.deliveredCount || 0} accounts.`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Broadcast failed');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleResolveInquiry = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/overview', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ section: 'communication', id, status: 'resolved' }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update inquiry');
+      toast.success('Inquiry marked as resolved');
+      await loadData();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update');
+    }
   };
 
   return (
-    <div className="space-y-6 text-white">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Megaphone className="w-6 h-6 text-emerald-400" /> Platform Communication & Moderation Suite
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <MessageSquare className="w-6 h-6 text-lime-500" /> Communications &amp; Inbound Enquiries
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Broadcast emergency compliance bulletins, manage multichannel notification templates, and resolve reported chats.
-          </p>
+          <p className="text-sm text-slate-400">Broadcast system notifications and manage sales/contact submissions</p>
         </div>
+        <Button variant="outline" size="sm" onClick={loadData} className="border-slate-800 bg-slate-900 text-slate-300">
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </Button>
       </div>
 
-      {/* Broadcast Form */}
-      <div className="p-6 bg-[#111111] rounded-2xl border border-white/10 space-y-4 shadow-xl">
-        <h3 className="font-bold text-sm text-white flex items-center gap-2">
-          <Send className="w-4 h-4 text-emerald-400" /> Broadcast System Announcement
-        </h3>
-
-        <form onSubmit={handleBroadcast} className="space-y-3 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-gray-300 mb-1">Target Audience</label>
-              <select
-                value={broadcastTarget}
-                onChange={(e) => setBroadcastTarget(e.target.value)}
-                className="w-full bg-[#18181b] border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
-              >
-                <option value="all">All Registered Users (CAs + Taxpayers)</option>
-                <option value="ca">Verified Chartered Accountants Only</option>
-                <option value="taxpayer">Individual Taxpayers Only</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-gray-300 mb-1">Delivery Channel</label>
-              <select className="w-full bg-[#18181b] border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500">
-                <option value="in_app">In-App Banner + Notification Center</option>
-                <option value="email">Email Blast + In-App</option>
-                <option value="all">Multichannel (Email, SMS & In-App)</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-gray-300 mb-1">Announcement Message *</label>
-            <textarea
-              rows={3}
-              required
-              placeholder="e.g. Income Tax Department has extended the ITR-2 filing deadline to 15 August 2026..."
-              value={announcementText}
-              onChange={(e) => setAnnouncementText(e.target.value)}
-              className="w-full bg-[#18181b] border border-white/10 rounded-xl p-2.5 text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
-              <Megaphone className="w-3.5 h-3.5 mr-1.5" /> Broadcast Now
+      <Card className="bg-slate-900 border-slate-800 p-6 space-y-4">
+        <h2 className="font-semibold text-slate-100 text-sm">Send Platform Notification Broadcast</h2>
+        <form onSubmit={handleBroadcast} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <Input
+            placeholder="Alert title (e.g. GSTR-3B Reminder)"
+            value={broadcastTitle}
+            onChange={(e) => setBroadcastTitle(e.target.value)}
+            className="bg-slate-950 border-slate-800 text-slate-100"
+          />
+          <Input
+            placeholder="Message body..."
+            value={broadcastMessage}
+            onChange={(e) => setBroadcastMessage(e.target.value)}
+            className="md:col-span-2 bg-slate-950 border-slate-800 text-slate-100"
+          />
+          <div className="flex gap-2">
+            <select value={targetRole} onChange={(e) => setTargetRole(e.target.value)} className="h-10 px-3 rounded-lg bg-slate-950 border border-slate-800 text-slate-100 text-xs">
+              <option value="ALL">All Users</option>
+              <option value="CA">CAs Only</option>
+              <option value="CLIENT">Clients Only</option>
+            </select>
+            <Button type="submit" disabled={sending} className="bg-lime-600 hover:bg-lime-500 text-slate-950 font-semibold shrink-0">
+              <Send className="w-4 h-4 mr-1" /> {sending ? 'Sending...' : 'Broadcast'}
             </Button>
           </div>
         </form>
-      </div>
+      </Card>
 
-      {/* Reported Users & Moderation */}
-      <div className="bg-[#111111] rounded-2xl border border-white/10 overflow-hidden shadow-xl p-6 space-y-4">
-        <h3 className="font-bold text-sm text-white flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-400" /> Reported Users & Chat Flagged Moderation
-        </h3>
-
-        <div className="space-y-3">
-          {reports.map((r) => (
-            <div key={r.id} className="p-4 bg-[#18181b] rounded-xl border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-white">{r.reportedUser}</span>
-                  <span className="text-gray-400">reported by <strong className="text-emerald-400">{r.reportedBy}</strong></span>
-                  <span className="text-gray-500">• {r.date}</span>
+      <Card className="bg-slate-900 border-slate-800 p-6 space-y-4">
+        <h2 className="font-semibold text-slate-100 text-sm">Inbound Contact &amp; Sales Enquiries ({inquiries.length})</h2>
+        {loading ? (
+          <div className="py-12 flex justify-center text-slate-400 gap-2">
+            <Loader2 className="w-5 h-5 animate-spin text-lime-500" /> Loading enquiries...
+          </div>
+        ) : inquiries.length === 0 ? (
+          <p className="text-xs text-slate-400 py-8 text-center">No inbound contact or sales enquiries yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {inquiries.map((inq) => (
+              <div key={inq.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-100 text-sm">{inq.subject || `${inq.inquiry_type.toUpperCase()} Enquiry`}</span>
+                    <Badge className="bg-slate-800 text-lime-400 border-slate-700 text-[10px]">{inq.inquiry_type}</Badge>
+                    <Badge className={inq.status === 'resolved' ? 'bg-lime-600/20 text-lime-400 text-[10px]' : 'bg-amber-500/20 text-amber-400 text-[10px]'}>
+                      {inq.status}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-300">{inq.message}</p>
+                  <p className="text-[11px] text-slate-500">
+                    From: {inq.name} ({inq.email}) • {new Date(inq.created_at).toLocaleString('en-IN')}
+                  </p>
                 </div>
-                <p className="text-gray-300">{r.reason}</p>
+                {inq.status !== 'resolved' && (
+                  <Button size="sm" variant="outline" onClick={() => handleResolveInquiry(inq.id)} className="border-lime-500/30 text-lime-400 shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Mark Resolved
+                  </Button>
+                )}
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                  {r.status}
-                </span>
-                <Button size="sm" variant="outline" onClick={() => toast.info("Opening audit investigation logs")} className="border-white/10 text-xs">
-                  Review Chat
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

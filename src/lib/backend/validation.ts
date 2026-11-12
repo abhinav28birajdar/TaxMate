@@ -95,7 +95,7 @@ export const ticketReplySchema = z.object({
 
 export const featureFlagSchema = z.object({
   key: z.string().min(1, 'Key is required').max(100),
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1).optional(),
   description: z.string().optional(),
   isEnabled: z.boolean(),
   rolloutPercentage: z.number().int().min(0).max(100).optional().default(0),
@@ -137,6 +137,7 @@ export const onboardingSchema = z.object({
 
 export const profileSchema = z.object({
   fullName: z.string().optional(),
+  phone: z.string().max(30).optional().nullable(),
   bio: z.string().optional(),
   website: z.string().url().optional().nullable(),
   twitter: z.string().optional().nullable(),
@@ -151,7 +152,13 @@ export const settingsSchema = z.object({
   timezone: z.string().optional(),
   emailNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
+  smsNotifications: z.boolean().optional(),
   marketingEmails: z.boolean().optional(),
+  onlineStatusVisible: z.boolean().optional(),
+  readReceipts: z.boolean().optional(),
+  chatAudioAlerts: z.boolean().optional(),
+  autoDownloadAttachments: z.boolean().optional(),
+  biometricsEnabled: z.boolean().optional(),
 });
 
 export const supportTicketSchema = z.object({

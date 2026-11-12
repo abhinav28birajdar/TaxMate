@@ -44,35 +44,7 @@ const nextConfig = {
   },
 
   // Webpack configuration
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.optimization = {
-        ...config.optimization,
-        runtimeChunk: 'single',
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            // Vendor chunk
-            vendor: {
-              filename: 'chunks/vendor.js',
-              test: /node_modules/,
-              priority: 10,
-              reuseExistingChunk: true,
-              name: 'vendor',
-            },
-            // Common chunk
-            common: {
-              minChunks: 2,
-              priority: 5,
-              reuseExistingChunk: true,
-              name: 'common',
-            },
-          },
-        },
-      };
-    }
+  webpack: (config) => {
     return config;
   },
 
@@ -127,6 +99,15 @@ const nextConfig = {
   // Experimental features (minimal config for stability)
   experimental: {
     esmExternals: true,
+    cpus: 1,
+    serverComponentsExternalPackages: [
+      '@sentry/nextjs',
+      '@opentelemetry/api',
+      '@opentelemetry/instrumentation',
+      '@opentelemetry/sdk-node',
+      'bullmq',
+      'ioredis',
+    ],
   },
 
   // Skip type checks during build (TypeScript already checked)

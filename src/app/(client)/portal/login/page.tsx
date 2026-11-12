@@ -10,6 +10,7 @@ import { Loader2, ShieldAlert, KeyRound, Mail, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { createClient } from '@/utils/supabase/client';
 import { toast } from 'sonner';
+import { getDashboardPathForRole, normalizeRole } from '@/lib/auth-routing';
 
 export default function PortalLoginPage() {
     const router = useRouter();
@@ -35,15 +36,27 @@ export default function PortalLoginPage() {
 
             toast.success('Access granted. Authenticated successfully.');
 
-            // Check metadata role and direct accordingly
-            const userRole = data.user?.app_metadata?.role || 'client';
-            
-            if (userRole === 'client') {
-                const redirectTo = searchParams.get('redirectTo') || '/portal/dashboard';
-                router.push(redirectTo);
+            // Supabase sign-up metadata is stored in user_metadata. app_metadata is
+            // retained here for accounts provisioned by an administrator.
+            const userRole = normalizeRole(
+                data.user?.app_metadata?.role ||
+                    data.user?.app_metadata?.user_role ||
+                    data.user?.user_metadata?.role ||
+                    data.user?.user_metadata?.user_role ||
+                    null
+            );
+
+            if (userRole === 'CLIENT' || userRole === null) {
+                const requestedPath = searchParams.get('redirectTo');
+                // Do not allow a query parameter to send an authenticated user to a
+                // third-party site or to another role's workspace.
+                const redirectTo = requestedPath?.startsWith('/portal/')
+                    ? requestedPath
+                    : '/portal/dashboard';
+                router.replace(redirectTo);
             } else {
                 toast.warning('Operator account detected. Redirecting to CA Dashboard...');
-                router.push('/dashboard');
+                router.replace(getDashboardPathForRole(userRole));
             }
             router.refresh();
         } catch (error: any) {

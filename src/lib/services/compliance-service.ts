@@ -65,6 +65,10 @@ export class ComplianceService {
       .from('compliance_deadlines')
       .select('*');
 
+    if (userId) {
+      query = query.or(`client_id.eq.${userId},ca_id.eq.${userId}`);
+    }
+
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
@@ -98,13 +102,19 @@ export class ComplianceService {
     const today = new Date();
     const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    const { data, error } = await this.getSupabase()
+    let query = this.getSupabase()
       .from('compliance_deadlines')
       .select('*')
       .eq('status', 'pending')
       .gte('due_date', today.toISOString().split('T')[0])
       .lte('due_date', thirtyDaysLater.toISOString().split('T')[0])
       .order('due_date', { ascending: true });
+
+    if (userId) {
+      query = query.or(`client_id.eq.${userId},ca_id.eq.${userId}`);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data || [];
@@ -116,11 +126,17 @@ export class ComplianceService {
   async getOverdueDeadlines(userId: string): Promise<ComplianceDeadline[]> {
     const today = new Date().toISOString().split('T')[0];
 
-    const { data, error } = await this.getSupabase()
+    let query = this.getSupabase()
       .from('compliance_deadlines')
       .select('*')
       .eq('status', 'pending')
       .lt('due_date', today);
+
+    if (userId) {
+      query = query.or(`client_id.eq.${userId},ca_id.eq.${userId}`);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data || [];
@@ -232,9 +248,15 @@ export class ComplianceService {
     overdue: number;
     completionRate: number;
   }> {
-    const { data, error } = await this.getSupabase()
+    let query = this.getSupabase()
       .from('compliance_deadlines')
       .select('status', { count: 'exact' });
+
+    if (userId) {
+      query = query.or(`client_id.eq.${userId},ca_id.eq.${userId}`);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 

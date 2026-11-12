@@ -1,107 +1,136 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { 
-  CreditCard, 
-  IndianRupee, 
-  TrendingUp, 
-  ArrowUpRight, 
-  Download, 
-  CheckCircle2, 
-  AlertCircle, 
-  RefreshCw,
-  Receipt
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import React, { useCallback, useEffect, useState } from 'react';
+import { CreditCard, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toast } from 'sonner';
 
-export default function AdminPaymentManagementPage() {
-  const transactions = [
-    { id: "tx-1", ref: "PAY-2026-9012", from: "TechNova Solutions Pvt Ltd", to: "CA Rajesh Sharma, FCA", amount: "₹1,50,000", fee: "₹3,000", method: "Razorpay UPI", status: "Settled", date: "Today, 11:30 AM" },
-    { id: "tx-2", ref: "PAY-2026-8910", from: "Ananya Deshmukh", to: "CA Rajesh Sharma, FCA", amount: "₹4,999", fee: "₹99", method: "HDFC Card", status: "Settled", date: "Yesterday" },
-    { id: "tx-3", ref: "PAY-2026-8742", from: "Karan Malhotra", to: "TaxMate Escrow", amount: "₹1,999", fee: "₹0", method: "UPI", status: "Refunded", date: "22 Oct 2026" },
-    { id: "tx-4", ref: "PAY-2026-8611", from: "Apex Logistics India", to: "CA Priya Mehta", amount: "₹12,000", fee: "₹240", method: "NetBanking", status: "Settled", date: "20 Oct 2026" }
-  ];
+interface AdminPaymentRow {
+  id: string;
+  txId: string;
+  amount: number;
+  currency: string;
+  status: string;
+  gateway: string;
+  caName: string;
+  clientName: string;
+  paidAt: string;
+}
+
+export default function AdminPaymentsPage() {
+  const [payments, setPayments] = useState<AdminPaymentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadPayments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/overview?section=payments', { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to load payments');
+      setPayments(Array.isArray(json.items) ? json.items : []);
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to load payment ledger');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPayments();
+  }, [loadPayments]);
+
+  const handleMarkReconciled = async (id: string, status: string) => {
+    try {
+      const res = await fetch('/api/admin/overview', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ section: 'payments', id, status }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Update failed');
+      toast.success(`Payment updated to ${status}`);
+      await loadPayments();
+    } catch (err: any) {
+      toast.error(err?.message || 'Update failed');
+    }
+  };
+
+  const totalVolume = payments
+    .filter((p) => p.status === 'COMPLETED' || p.status === 'PAID' || p.status === 'CAPTURED')
+    .reduce((acc, p) => acc + Number(p.amount || 0), 0);
 
   return (
-    <div className="space-y-6 text-white">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <CreditCard className="w-6 h-6 text-emerald-400" /> Platform Billing & Escrow Gateway
+          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+            <CreditCard className="w-6 h-6 text-lime-500" /> Platform Payments &amp; Escrow Ledger
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Track Gross Merchandise Value (GMV), Razorpay/Stripe webhooks, escrow settlements, and gateway commission fees.
-          </p>
+          <p className="text-sm text-slate-400">Settled Volume: ₹{totalVolume.toLocaleString('en-IN')}</p>
         </div>
-
-        <Button
-          onClick={() => toast.success("Downloaded platform financial ledger.")}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-[0_0_20px_rgba(5,150,105,0.4)]"
-        >
-          <Download className="w-3.5 h-3.5 mr-1.5" /> Download Monthly Ledger
+        <Button variant="outline" size="sm" onClick={loadPayments} className="border-slate-800 bg-slate-900 text-slate-300">
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">Total Platform GMV</span>
-          <div className="text-xl font-bold font-mono text-white">₹1.84 Cr</div>
-          <span className="text-[10px] text-emerald-400 font-semibold">+18.5% YoY</span>
+      <Card className="bg-slate-900 border-slate-800 p-6">
+        <div className="rounded-xl border border-slate-800 overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-950">
+              <TableRow className="border-slate-800">
+                <TableHead className="text-slate-400">Transaction ID</TableHead>
+                <TableHead className="text-slate-400">Client</TableHead>
+                <TableHead className="text-slate-400">CA Partner</TableHead>
+                <TableHead className="text-slate-400">Amount</TableHead>
+                <TableHead className="text-slate-400">Gateway</TableHead>
+                <TableHead className="text-slate-400">Status</TableHead>
+                <TableHead className="text-slate-400 text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow className="border-slate-800">
+                  <TableCell colSpan={7} className="py-12 text-center text-slate-400">
+                    <Loader2 className="w-5 h-5 animate-spin inline mr-2 text-lime-500" /> Loading transactions...
+                  </TableCell>
+                </TableRow>
+              ) : payments.length === 0 ? (
+                <TableRow className="border-slate-800">
+                  <TableCell colSpan={7} className="py-12 text-center text-slate-400">
+                    No platform payments recorded yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                payments.map((p) => (
+                  <TableRow key={p.id} className="border-slate-800 hover:bg-slate-950/50">
+                    <TableCell className="font-mono text-xs text-lime-400">{p.txId}</TableCell>
+                    <TableCell className="text-xs text-slate-200">{p.clientName}</TableCell>
+                    <TableCell className="text-xs text-slate-300">{p.caName}</TableCell>
+                    <TableCell className="font-mono text-slate-100 font-semibold">
+                      ₹{Number(p.amount || 0).toLocaleString('en-IN')}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-400">{p.gateway}</TableCell>
+                    <TableCell>
+                      <Badge className="bg-slate-800 text-lime-400 border-slate-700 text-[10px]">{p.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {p.status === 'PENDING' && (
+                        <Button size="sm" variant="outline" onClick={() => handleMarkReconciled(p.id, 'COMPLETED')} className="border-lime-500/30 text-lime-400 h-7 text-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Reconcile
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">Platform Commission (Net)</span>
-          <div className="text-xl font-bold font-mono text-emerald-400">₹14.20 L</div>
-          <span className="text-[10px] text-gray-500">2% Escrow Fee</span>
-        </div>
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">Pending Escrow Release</span>
-          <div className="text-xl font-bold font-mono text-amber-400">₹8.45 L</div>
-          <span className="text-[10px] text-gray-500">Releases upon filing</span>
-        </div>
-        <div className="p-4 bg-[#111111] border border-white/10 rounded-2xl space-y-1">
-          <span className="text-gray-400">Total Refunds Processed</span>
-          <div className="text-xl font-bold font-mono text-rose-400">₹42,000</div>
-          <span className="text-[10px] text-gray-500">Zero chargeback fines</span>
-        </div>
-      </div>
-
-      {/* Transactions Table */}
-      <div className="bg-[#111111] rounded-2xl border border-white/10 overflow-hidden shadow-xl">
-        <table className="w-full text-left text-xs text-gray-300">
-          <thead className="bg-[#18181b] text-white font-semibold border-b border-white/10">
-            <tr>
-              <th className="py-3.5 px-4">Transaction Ref</th>
-              <th className="py-3.5 px-4">Customer</th>
-              <th className="py-3.5 px-4">Beneficiary CA</th>
-              <th className="py-3.5 px-4">Amount</th>
-              <th className="py-3.5 px-4">Platform Fee</th>
-              <th className="py-3.5 px-4">Payment Method</th>
-              <th className="py-3.5 px-4">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {transactions.map((tx) => (
-              <tr key={tx.id} className="hover:bg-[#18181b]/50 transition-colors">
-                <td className="py-3.5 px-4 font-mono font-bold text-white">{tx.ref}</td>
-                <td className="py-3.5 px-4 text-emerald-300">{tx.from}</td>
-                <td className="py-3.5 px-4 text-gray-200">{tx.to}</td>
-                <td className="py-3.5 px-4 font-mono font-extrabold text-white">{tx.amount}</td>
-                <td className="py-3.5 px-4 font-mono text-emerald-400">{tx.fee}</td>
-                <td className="py-3.5 px-4 text-gray-400">{tx.method}</td>
-                <td className="py-3.5 px-4">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                    tx.status === "Settled" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                  }`}>
-                    {tx.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      </Card>
     </div>
   );
 }

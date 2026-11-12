@@ -11,14 +11,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const parsed = forgotPasswordSchema.parse(body);
-    const token = await createPasswordReset(parsed.email);
+    await createPasswordReset(parsed.email);
 
     return ok(
       {
         email: parsed.email,
-        resetToken: token,
       },
-      'If an account exists, password reset has been initiated.'
+      'If an account exists, password reset instructions have been sent.'
     );
   } catch (error) {
     return fail(error);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createHash } from 'crypto';
+import { getServiceClient } from '@/lib/backend/supabase';
 import { registerSchema } from '@/lib/validators/auth';
 import {
   hashPassword,
@@ -14,7 +15,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate input
     const validation = registerSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -27,17 +27,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, password, name, phone, role, icaiNumber, companyName } = validation.data;
+    const { password, name, phone, role, icaiNumber, companyName } = validation.data;
+    const email = validation.data.email.toLowerCase().trim();
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
 
-    const supabase = await createClient();
+    const supabase = getServiceClient();
 
-    // Check if user already exists
     const existingUser = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     if (existingUser.data) {
       return NextResponse.json(
@@ -46,14 +46,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Create user in Supabase Auth
     const authUser = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: false,
+      app_metadata: { role },
       user_metadata: {
         name,
         role,
@@ -76,66 +75,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create user profile in database
-    const profileData: any = {
-      id: userId,
-      email,
-      name,
-      phone,
-      role: role,
-      status: 'PENDING_VERIFICATION',
-      password_hash: passwordHash,
-      email_verified: false,
-    };
-
-    const userInsert = await supabase
-      .from('users')
-      .insert([profileData]);
+    const userInsert = await supabase.from('users').insert([
+      {
+        id: userId,
+        email,
+        name,
+        phone: phone || null,
+        role,
+        status: 'PENDING_VERIFICATION',
+        password_hash: passwordHash,
+        email_verified: false,
+      },
+    ]);
 
     if (userInsert.error) {
       console.error('Profile creation error:', userInsert.error);
+      await supabase.auth.admin.deleteUser(userId);
       return NextResponse.json(
         { success: false, error: 'Failed to create user profile' },
         { status: 500 }
       );
     }
 
-    // Create role-specific profile
-    if (role === 'CA' && icaiNumber) {
-      await supabase
-        .from('ca_profiles')
-        .insert([{
+    await supabase.from('profiles').upsert({
+      id: userId,
+      email,
+      full_name: name,
+      phone: phone || null,
+      role,
+      is_active: true,
+    });
+
+    if (role === 'CA') {
+      await supabase.from('ca_profiles').insert([
+        {
           id: userId,
           user_id: userId,
-          icai_membership_number: icaiNumber,
+          icai_membership_number: icaiNumber || null,
           status: 'PENDING',
-        }]);
-    } else if (role === 'CLIENT' && companyName) {
-      await supabase
-        .from('client_profiles')
-        .insert([{
+        },
+      ]);
+    } else if (role === 'CLIENT') {
+      await supabase.from('client_profiles').insert([
+        {
           id: userId,
           user_id: userId,
-          business_name: companyName,
-        }]);
+          business_name: companyName || name,
+        },
+      ]);
     }
 
-    // Generate verification token
-    const verificationToken = generateVerificationToken();
-    await supabase
-      .from('verification_tokens')
-      .insert([{
+    const rawToken = generateVerificationToken();
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+
+    await supabase.from('verification_tokens').insert([
+      {
         user_id: userId,
-        token: verificationToken,
+        token: tokenHash,
         type: 'EMAIL_VERIFICATION',
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      }]);
+      },
+    ]);
 
-    // Send verification email
-    const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify-email?token=${verificationToken}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const verificationLink = `${appUrl}/verify-email?token=${encodeURIComponent(rawToken)}`;
     await sendVerificationEmail(email, name, verificationLink);
 
-    // Create audit log
     await createAuditLog(userId, 'USER_REGISTERED', 'USER', userId, ipAddress);
 
     return NextResponse.json(

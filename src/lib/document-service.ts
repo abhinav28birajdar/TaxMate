@@ -258,10 +258,20 @@ export const documentService = {
   async shareDocument(documentId: string, sharedWithClient: boolean = true) {
     const supabase = await createServerClient();
 
+    const { data: existing } = await supabase
+      .from('documents')
+      .select('metadata')
+      .eq('id', documentId)
+      .maybeSingle();
+
+    const existingMeta = (existing?.metadata && typeof existing.metadata === 'object') ? existing.metadata : {};
+
     const { data: document, error } = await supabase
       .from('documents')
       .update({
+        is_shared_with_ca: sharedWithClient,
         metadata: {
+          ...existingMeta,
           is_shared_with_client: sharedWithClient,
           shared_at: sharedWithClient ? new Date().toISOString() : null,
         },

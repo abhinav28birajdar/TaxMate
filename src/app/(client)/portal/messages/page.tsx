@@ -44,179 +44,119 @@ export default function ClientMessages() {
     useEffect(() => {
         if (!user) return;
 
+        let channel: any = null;
+
         const loadChat = async () => {
             try {
-                // 1. Fetch client details
-                const { data: client } = await supabase
-                    .from('clients')
-                    .select('*')
-                    .eq('portal_user_id', user.id)
-                    .maybeSingle();
-
-                let clientId = 'mock-client-id';
-                let caId = 'mock-ca-id';
-                let orgId = 'mock-org-id';
-
-                if (client) {
-                    setClientData(client);
-                    clientId = client.id;
-                    caId = client.assigned_ca_id || caId;
-                    orgId = client.organization_id || orgId;
+                const res = await fetch('/api/conversations');
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(json.error || 'Failed to load conversations');
                 }
 
-                // 2. Find or create conversation with CA
-                let { data: conv, error: convError } = await supabase
-                    .from('conversations')
-                    .select('*')
-                    .eq('client_id', clientId)
-                    .maybeSingle();
-
-                if (!conv) {
-                    // Try to insert a new conversation
-                    const { data: newConv, error: createError } = await supabase
-                        .from('conversations')
-                        .insert({
-                            organization_id: orgId === 'mock-org-id' ? '00000000-0000-0000-0000-000000000000' : orgId,
-                            type: 'client',
-                            client_id: clientId,
-                            title: `Chat with ${client?.full_name || user.name}`
-                        })
-                        .select()
-                        .single();
-
-                    if (!createError && newConv) {
-                        conv = newConv;
-                        
-                        // Add participants
-                        await supabase.from('conversation_participants').insert([
-                            { conversation_id: conv.id, user_id: user.id, role: 'member' },
-                            { conversation_id: conv.id, user_id: caId, role: 'member' }
-                        ]);
+                let conv = (json.conversations || [])[0] || null;
+                if (!conv && (json.contacts || []).length > 0) {
+                    const firstCa = json.contacts[0];
+                    const createRes = await fetch('/api/conversations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            participantId: firstCa.id,
+                            title: `Consultation with ${firstCa.name}`,
+                        }),
+                    });
+                    if (createRes.ok) {
+                        const createdJson = await createRes.json().catch(() => ({}));
+                        conv = createdJson.conversation || null;
                     }
                 }
 
                 if (conv) {
                     setConversation(conv);
+                    setClientData(conv);
 
-                    // 3. Fetch existing messages
-                    const { data: msgs, error: msgsError } = await supabase
-                        .from('messages')
-                        .select('*')
-                        .eq('conversation_id', conv.id)
-                        .order('created_at', { ascending: true });
+                    const msgRes = await fetch(`/api/messages?conversationId=${encodeURIComponent(conv.id)}&limit=100`);
+                    const msgJson = await msgRes.json().catch(() => ({}));
+                    if (msgRes.ok) {
+                        setMessages(msgJson.data?.messages || msgJson.messages || []);
+                    }
 
-                    if (msgsError) throw msgsError;
-                    setMessages(msgs || []);
-
-                    // 4. Subscribe to Realtime messages for this conversation
-                    const channel = supabase.channel(`room-${conv.id}`)
-                        .on('postgres_changes', { 
-                            event: 'INSERT', 
-                            schema: 'public', 
+                    channel = supabase.channel(`room-${conv.id}`)
+                        .on('postgres_changes', {
+                            event: 'INSERT',
+                            schema: 'public',
                             table: 'messages',
                             filter: `conversation_id=eq.${conv.id}`
                         }, (payload) => {
                             setMessages(prev => {
-                                // Prevent duplicate inserts
                                 if (prev.some(m => m.id === payload.new.id)) return prev;
                                 return [...prev, payload.new];
                             });
                         })
                         .subscribe();
-
-                    return () => {
-                        supabase.removeChannel(channel);
-                    };
                 } else {
-                    // Fallback / Mock chat stream
-                    setMessages([
-                        {
-                            id: 'msg-1',
-                            sender_id: 'mock-ca-id',
-                            content: 'Hello! Welcome to TaxMate Secure Message Stream. How can we help you today?',
-                            created_at: new Date(Date.now() - 3600000 * 2).toISOString()
-                        },
-                        {
-                            id: 'msg-2',
-                            sender_id: user.id,
-                            content: 'Hi, I just wanted to check if you received my GST sales reports.',
-                            created_at: new Date(Date.now() - 3600000).toISOString()
-                        },
-                        {
-                            id: 'msg-3',
-                            sender_id: 'mock-ca-id',
-                            content: 'Yes, we received them. Priya from our team is auditing the sheets right now. We will notify you once filed.',
-                            created_at: new Date(Date.now() - 1800000).toISOString()
-                        }
-                    ]);
+                    setMessages([]);
                 }
             } catch (err: any) {
                 console.error('Error loading chat:', err);
-                toast.error('Realtime sync offline. Rerouting chat stream to simulation mode.');
+                toast.error(err.message || 'Unable to load advisor message stream.');
             } finally {
                 setLoading(false);
             }
         };
 
         loadChat();
+
+        return () => {
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
+        };
     }, [user, supabase]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        if (!newMessage.trim() || !user) return;
+        if (!conversation) {
+            toast.error('No active CA channel assigned yet. Hire a CA from Find CAs to start messaging.');
+            return;
+        }
 
         setSending(true);
-        const text = newMessage;
+        const text = newMessage.trim();
         setNewMessage('');
 
         try {
-            const timestamp = new Date().toISOString();
-            const tempId = `temp-msg-${Date.now()}`;
-            
-            const localMsg = {
-                id: tempId,
-                sender_id: user?.id || 'mock-client-id',
-                content: text,
-                created_at: timestamp
-            };
+            const res = await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    conversationId: conversation.id,
+                    content: text,
+                    messageType: 'TEXT',
+                }),
+            });
 
-            // Optimistic Update
-            setMessages(prev => [...prev, localMsg]);
-
-            if (conversation) {
-                const { data, error } = await supabase
-                    .from('messages')
-                    .insert({
-                        conversation_id: conversation.id,
-                        sender_id: user?.id,
-                        content: text,
-                        message_type: 'text'
-                    })
-                    .select()
-                    .single();
-
-                if (error) {
-                    console.warn('Supabase message insert failed, using mock persistence:', error.message);
-                } else if (data) {
-                    // Replace temp optimistic message with real db record
-                    setMessages(prev => prev.map(m => m.id === tempId ? data : m));
-                }
-            } else {
-                // If offline completely, trigger a mock automated CA reply after 1.5 seconds
-                setTimeout(() => {
-                    const mockReply = {
-                        id: `mock-reply-${Date.now()}`,
-                        sender_id: 'mock-ca-id',
-                        content: `Acknowledged. We have logged your request: "${text}". An operator will review this shortly.`,
-                        created_at: new Date().toISOString()
-                    };
-                    setMessages(prev => [...prev, mockReply]);
-                }, 1500);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.message || json.error || 'Message transmission failed');
             }
 
+            const savedMsg = json.data?.message || json.data || json;
+            setMessages(prev => {
+                if (prev.some(m => m.id === savedMsg.id)) return prev;
+                return [...prev, {
+                    id: savedMsg.id,
+                    sender_id: savedMsg.sender_id || savedMsg.senderId || user.id,
+                    content: savedMsg.content,
+                    message_type: savedMsg.message_type || 'TEXT',
+                    created_at: savedMsg.created_at || savedMsg.createdAt || new Date().toISOString(),
+                }];
+            });
             toast.success('Message sent.');
-        } catch (err) {
-            toast.error('Message transmission failed.');
+        } catch (err: any) {
+            setNewMessage(text);
+            toast.error(err.message || 'Message transmission failed.');
         } finally {
             setSending(false);
         }

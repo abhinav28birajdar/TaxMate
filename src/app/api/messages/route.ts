@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       if (!checkRateLimit(user.sub, 100, 60000)) {
         throw new ApiError('Message rate limit exceeded. Please wait before sending another message.', {
           code: 'RATE_LIMIT',
-          statusCode: HTTP_STATUS.INTERNAL_ERROR,
+          statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
         });
       }
 
@@ -38,10 +38,16 @@ export async function POST(request: NextRequest) {
 
       return {
         id: result.id,
-        conversationId: result.conversationId,
-        senderId: result.senderId,
+        conversationId: result.conversation_id,
+        senderId: result.sender_id,
+        replyToId: result.reply_to_id,
+        messageType: result.message_type,
+        attachments: result.attachments || [],
+        reactions: result.reactions || {},
+        isEdited: result.is_edited || false,
         content: result.content,
-        createdAt: result.createdAt,
+        createdAt: result.created_at,
+        message: result,
       };
     },
     {
@@ -60,8 +66,12 @@ export async function GET(request: NextRequest) {
     async (req, user) => {
       const { searchParams } = new URL(req.url);
       const conversationId = searchParams.get('conversationId');
-      const page = parseInt(searchParams.get('page') || '1');
-      const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
+      const requestedPage = Number.parseInt(searchParams.get('page') || '1', 10);
+      const requestedLimit = Number.parseInt(searchParams.get('limit') || '50', 10);
+      const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+      const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 100)
+        : 50;
 
       if (!conversationId) {
         throw new ApiError('Conversation ID is required', {
@@ -76,7 +86,7 @@ export async function GET(request: NextRequest) {
       // Verify user is part of conversation
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
-        .select('participant_ids')
+        .select('participant_ids, ca_id, client_id')
         .eq('id', conversationId)
         .single();
 
@@ -87,30 +97,68 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      if (!conversation.participant_ids?.includes(user.sub)) {
+      const { getResolvedClientIdsForUser } = await import('@/lib/api/server-auth');
+      const resolvedClientIds = await getResolvedClientIdsForUser(user.sub);
+      const isAuthorized =
+        conversation.participant_ids?.includes(user.sub) ||
+        conversation.ca_id === user.sub ||
+        (conversation.client_id && resolvedClientIds.includes(conversation.client_id));
+
+      if (!isAuthorized) {
         throw new ApiError('Not authorized to view this conversation', {
           code: 'FORBIDDEN',
           statusCode: HTTP_STATUS.FORBIDDEN,
         });
       }
 
-      // Fetch messages
+      // Fetch non-deleted messages
       const { data, count, error } = await supabase
         .from('messages')
         .select('*', { count: 'exact' })
-        .eq('conversationId', conversationId)
-        .order('createdAt', { ascending: false })
+        .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
         .range((page - 1) * limit, page * limit - 1);
 
       if (error) throw error;
 
-      // Mark messages as read
-      await supabase
+      // Persist read state through the normalized read-receipts table.
+      const { data: unreadMessages, error: unreadError } = await supabase
         .from('messages')
-        .update({ readAt: new Date().toISOString() })
-        .eq('conversationId', conversationId)
-        .neq('senderId', user.sub)
-        .is('readAt', null);
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
+        .neq('sender_id', user.sub);
+
+      if (unreadError) throw unreadError;
+
+      let toMarkRead = (unreadMessages || []).map(({ id }) => id);
+      if (toMarkRead.length > 0) {
+        const { data: existingReceipts, error: receiptsError } = await supabase
+          .from('message_read_receipts')
+          .select('message_id')
+          .eq('user_id', user.sub)
+          .in('message_id', toMarkRead);
+
+        if (receiptsError) throw receiptsError;
+
+        const readMessageIds = new Set((existingReceipts || []).map(({ message_id }) => message_id));
+        toMarkRead = toMarkRead.filter((id) => !readMessageIds.has(id));
+      }
+
+      if (toMarkRead.length > 0) {
+        const { error: receiptError } = await supabase
+          .from('message_read_receipts')
+          .upsert(
+            toMarkRead.map((id) => ({
+              message_id: id,
+              user_id: user.sub,
+            })),
+            { onConflict: 'message_id,user_id' }
+          );
+
+        if (receiptError) throw receiptError;
+      }
 
       return {
         messages: (data || []).reverse(), // Reverse to show oldest first

@@ -1,27 +1,35 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { 
-  Search, 
-  FileText, 
-  Users, 
-  Receipt, 
-  CheckSquare, 
-  MessageSquare, 
-  ShieldCheck, 
+import React, { useState, useEffect, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  Search,
+  FileText,
+  Users,
+  Receipt,
+  CheckSquare,
+  MessageSquare,
+  ShieldCheck,
   X,
   ArrowRight,
   Sparkles,
-  Command
+  Loader2,
+  Layers,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
 import { ALL_47_SECTIONS } from "@/lib/directory/all-modules-data";
+import { useAuth } from "@/hooks/UnifiedAuthContext";
 
 interface SearchItem {
   id: string;
-  category: "Clients" | "Documents" | "Tax Returns" | "Messages" | "Transactions" | "Tasks" | "Modules & Pages";
+  category:
+    | "Clients"
+    | "Documents"
+    | "Tax Returns"
+    | "Messages"
+    | "Transactions"
+    | "Tasks"
+    | "Modules & Pages";
   title: string;
   subtitle: string;
   url: string;
@@ -31,7 +39,7 @@ interface SearchItem {
 const moduleSearchItems: SearchItem[] = ALL_47_SECTIONS.flatMap((sec) => [
   {
     id: `sec-${sec.id}`,
-    category: "Modules & Pages",
+    category: "Modules & Pages" as const,
     title: sec.title,
     subtitle: sec.tagline,
     url: sec.primaryHref,
@@ -47,37 +55,6 @@ const moduleSearchItems: SearchItem[] = ALL_47_SECTIONS.flatMap((sec) => [
   })),
 ]);
 
-const mockSearchItems: SearchItem[] = [
-  ...moduleSearchItems,
-  // Clients
-  { id: "c1", category: "Clients", title: "TechNova Solutions Pvt Ltd", subtitle: "GSTIN: 07AAAAA0000A1Z5 • Pro Audit Client", url: "/ca/clients/c1", badge: "Active CA Client" },
-  { id: "c2", category: "Clients", title: "Ananya Deshmukh", subtitle: "PAN: ABCPD1234E • Salaried & Stock Trader", url: "/ca/clients/c2", badge: "ITR-2 Filing" },
-  { id: "c3", category: "Clients", title: "Apex Logistics India", subtitle: "TDS Q2 Review • Retainer Engagement", url: "/ca/clients/c3", badge: "Corporate" },
-
-  // Documents
-  { id: "d1", category: "Documents", title: "Form 16 Part A & B (AY 2026-27)", subtitle: "PDF • 2.4 MB • Employer: Infosys Ltd", url: "/client/documents", badge: "Form 16" },
-  { id: "d2", category: "Documents", title: "HDFC Bank Statement Q2 (180 Pages)", subtitle: "PDF • 4.1 MB • OCR Extracted & Verified", url: "/client/documents", badge: "Bank Statement" },
-  { id: "d3", category: "Documents", title: "Form 26AS Tax Credit Statement", subtitle: "Tax Vault • Verified by CA Rajesh Sharma", url: "/client/documents", badge: "Tax Credit" },
-  { id: "d4", category: "Documents", title: "LIC & ELSS Investment Receipts Sec 80C", subtitle: "Proof of ₹1,50,000 deduction", url: "/client/documents", badge: "80C Proof" },
-
-  // Tax Returns
-  { id: "r1", category: "Tax Returns", title: "ITR-2 Annual Return Filing AY 2026-27", subtitle: "Status: Client Approval Pending • Refund: ₹42,500", url: "/client/tax-returns", badge: "ITR-2 Draft" },
-  { id: "r2", category: "Tax Returns", title: "GSTR-3B Monthly Return (September 2026)", subtitle: "Status: Ready for E-Filing • Tax: ₹1,24,000", url: "/ca/gst", badge: "GST Return" },
-  { id: "r3", category: "Tax Returns", title: "TDS Form 26Q Quarter 2 Filing", subtitle: "Challan 281 Attached • Due 31 Oct", url: "/ca/income-tax", badge: "TDS Filing" },
-
-  // Messages
-  { id: "m1", category: "Messages", title: "CA Rajesh Sharma", subtitle: "Please verify your foreign dividend withholding tax in draft ITR.", url: "/client/chat", badge: "Unread Msg" },
-  { id: "m2", category: "Messages", title: "TechNova Q2 Tax Audit Team", subtitle: "Shared revised depreciation schedule for factory machinery.", url: "/ca/chat", badge: "Team Chat" },
-
-  // Transactions
-  { id: "t1", category: "Transactions", title: "CA Retainer & GST Advisory Fee (₹1,50,000)", subtitle: "Invoice #INV-2026-0042 • Razorpay UPI Paid", url: "/client/payments", badge: "Settled" },
-  { id: "t2", category: "Transactions", title: "ITR Filing & Capital Gains Package (₹4,999)", subtitle: "Invoice #INV-2026-0019 • Paid via NetBanking", url: "/client/payments", badge: "Paid" },
-
-  // Tasks
-  { id: "k1", category: "Tasks", title: "Reconcile GSTR-2B Input Tax Credit with Purchase Register", subtitle: "Assigned to Senior CA • Due: 20 Oct", url: "/ca/tasks/kanban", badge: "In Progress" },
-  { id: "k2", category: "Tasks", title: "Verify Sec 115BAC New Regime vs Old Regime Savings", subtitle: "Client Approval Required before Submission", url: "/ca/tasks/kanban", badge: "Review" },
-];
-
 export function GlobalSearchDialog({
   isOpen,
   onClose,
@@ -87,38 +64,201 @@ export function GlobalSearchDialog({
 }) {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [liveItems, setLiveItems] = useState<SearchItem[]>([]);
+  const [loadingLive, setLoadingLive] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const router = useRouter();
+  const pathname = usePathname();
+  const { user, role } = useAuth();
+
+  const isCaContext = pathname?.startsWith("/ca") || role === "CA" || role === "STAFF";
+  const prefix = pathname?.startsWith("/admin")
+    ? "/admin"
+    : isCaContext
+    ? "/ca"
+    : "/client";
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        if (isOpen) onClose();
-      }
-      if (e.key === "Escape" && isOpen) {
-        onClose();
+    if (!isOpen || !user) return;
+
+    let cancelled = false;
+    const loadLiveRecords = async () => {
+      setLoadingLive(true);
+      try {
+        const requests: Array<Promise<SearchItem[]>> = [];
+
+        if (isCaContext || role === "SUPER_ADMIN") {
+          requests.push(
+            fetch("/api/clients?take=25")
+              .then((r) => (r.ok ? r.json() : { clients: [] }))
+              .then((res) =>
+                (res.clients || []).map((c: any) => ({
+                  id: `cli-${c.id}`,
+                  category: "Clients" as const,
+                  title: c.display_name || c.full_name || "Client",
+                  subtitle: `${c.pan ? `PAN: ${c.pan}` : c.email || ""} • ${c.client_type || "individual"}`,
+                  url: `/ca/clients/${c.id}`,
+                  badge: c.status || "active",
+                }))
+              )
+              .catch(() => [])
+          );
+        }
+
+        requests.push(
+          fetch("/api/documents?take=25")
+            .then((r) => (r.ok ? r.json() : { documents: [] }))
+            .then((res) =>
+              (res.documents || []).map((d: any) => ({
+                id: `doc-${d.id}`,
+                category: "Documents" as const,
+                title: d.name || d.file_name || "Document",
+                subtitle: `${d.document_type || d.category || "Vault File"} • ${d.financial_year || "Latest"}`,
+                url: `${prefix === "/admin" ? "/admin/documents" : `${prefix}/documents`}`,
+                badge: d.status || "uploaded",
+              }))
+            )
+            .catch(() => [])
+        );
+
+        requests.push(
+          fetch("/api/itr")
+            .then((r) => (r.ok ? r.json() : { data: [] }))
+            .then((res) =>
+              (res.data || []).map((itr: any) => ({
+                id: `itr-${itr.id}`,
+                category: "Tax Returns" as const,
+                title: `${itr.itrType || itr.filingType || "ITR"} (${itr.assessmentYear || itr.financialYear || ""})`,
+                subtitle: `${itr.taxpayerName ? `${itr.taxpayerName} • ` : ""}Status: ${itr.status || "in-progress"}`,
+                url: isCaContext ? "/ca/income-tax" : "/client/tax-returns",
+                badge: itr.status || "Draft",
+              }))
+            )
+            .catch(() => [])
+        );
+
+        requests.push(
+          fetch("/api/tasks?limit=25")
+            .then((r) => (r.ok ? r.json() : { tasks: [] }))
+            .then((res) =>
+              (res.tasks || []).map((t: any) => ({
+                id: `tsk-${t.id}`,
+                category: "Tasks" as const,
+                title: t.title,
+                subtitle: `${t.client_name ? `${t.client_name} • ` : ""}Assigned: ${t.assigned_to_name || "Team"}`,
+                url: isCaContext ? "/ca/tasks/kanban" : "/client/compliance",
+                badge: t.status || "TODO",
+              }))
+            )
+            .catch(() => [])
+        );
+
+        requests.push(
+          fetch("/api/payments?limit=20")
+            .then((r) => (r.ok ? r.json() : { data: { invoices: [] } }))
+            .then((res) => {
+              const invoices = res.data?.invoices || res.invoices || [];
+              return invoices.map((inv: any) => ({
+                id: `inv-${inv.id}`,
+                category: "Transactions" as const,
+                title: `${inv.invoiceNumber || inv.invoice_number || "Invoice"} • ₹${Number(inv.amount || 0).toLocaleString("en-IN")}`,
+                subtitle: inv.description || "Billing & Tax Advisory Fee",
+                url: isCaContext ? "/ca/payments" : "/client/payments",
+                badge: inv.status || "ISSUED",
+              }));
+            })
+            .catch(() => [])
+        );
+
+        requests.push(
+          fetch("/api/conversations")
+            .then((r) => (r.ok ? r.json() : { conversations: [] }))
+            .then((res) =>
+              (res.conversations || []).map((conv: any) => ({
+                id: `msg-${conv.id}`,
+                category: "Messages" as const,
+                title: conv.displayTitle || conv.title || "Consultation Chat",
+                subtitle: conv.lastMessageText || conv.subject || "Direct encrypted channel",
+                url: isCaContext ? "/ca/chat" : "/client/chat",
+                badge: conv.unreadCount > 0 ? `${conv.unreadCount} unread` : "Chat",
+              }))
+            )
+            .catch(() => [])
+        );
+
+        const chunks = await Promise.all(requests);
+        if (!cancelled) {
+          setLiveItems(chunks.flat());
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingLive(false);
+        }
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
-  const categories = ["All", "Modules & Pages", "Clients", "Documents", "Tax Returns", "Messages", "Transactions", "Tasks"];
+    loadLiveRecords();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, user, isCaContext, role, prefix]);
 
-  const filteredResults = mockSearchItems.filter((item) => {
-    const matchesCat = activeCategory === "All" || item.category === activeCategory;
-    const matchesQuery =
-      query.trim() === "" ||
-      item.title.toLowerCase().includes(query.toLowerCase()) ||
-      item.subtitle.toLowerCase().includes(query.toLowerCase()) ||
-      item.category.toLowerCase().includes(query.toLowerCase());
-    return matchesCat && matchesQuery;
-  });
+  const categories = [
+    "All",
+    "Modules & Pages",
+    "Clients",
+    "Documents",
+    "Tax Returns",
+    "Messages",
+    "Transactions",
+    "Tasks",
+  ];
+
+  const allItems = useMemo(() => [...liveItems, ...moduleSearchItems], [liveItems]);
+
+  const filteredResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allItems.filter((item) => {
+      const matchesCat = activeCategory === "All" || item.category === activeCategory;
+      const matchesQuery =
+        q === "" ||
+        item.title.toLowerCase().includes(q) ||
+        item.subtitle.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q);
+      return matchesCat && matchesQuery;
+    });
+  }, [allItems, activeCategory, query]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query, activeCategory, isOpen]);
 
   const handleSelect = (url: string) => {
     onClose();
     router.push(url);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((prev) =>
+          filteredResults.length > 0 ? Math.min(prev + 1, filteredResults.length - 1) : 0
+        );
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === "Enter" && filteredResults[selectedIndex]) {
+        e.preventDefault();
+        handleSelect(filteredResults[selectedIndex].url);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose, filteredResults, selectedIndex]);
 
   return (
     <AnimatePresence>
@@ -137,11 +277,12 @@ export function GlobalSearchDialog({
               <input
                 type="text"
                 autoFocus
-                placeholder="Search clients, documents, ITR returns, messages, payments, tasks..."
+                placeholder="Search live clients, documents, ITR returns, messages, payments, tasks..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full bg-transparent text-sm sm:text-base text-white placeholder-gray-500 focus:outline-none"
               />
+              {loadingLive && <Loader2 className="w-4 h-4 text-emerald-400 animate-spin mr-2 shrink-0" />}
               {query && (
                 <button onClick={() => setQuery("")} className="text-gray-400 hover:text-white mr-2">
                   <X className="w-4 h-4" />
@@ -181,15 +322,22 @@ export function GlobalSearchDialog({
                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto text-gray-400">
                     <Search className="w-6 h-6" />
                   </div>
-                  <p className="text-sm font-medium text-gray-300">No records found for &quot;{query}&quot;</p>
-                  <p className="text-xs text-gray-500">Try searching for &quot;Form 16&quot;, &quot;TechNova&quot;, &quot;ITR-2&quot;, or &quot;GSTR&quot;</p>
+                  <p className="text-sm font-medium text-gray-300">
+                    No records found{query ? ` for "${query}"` : ""}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Try searching for a module name, document title, filing period, or client record
+                  </p>
                 </div>
               ) : (
-                filteredResults.map((item) => (
+                filteredResults.slice(0, 60).map((item, idx) => (
                   <div
                     key={item.id}
                     onClick={() => handleSelect(item.url)}
-                    className="p-3 rounded-xl hover:bg-[#1A1A1A] transition-all cursor-pointer flex items-center justify-between group"
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    className={`p-3 rounded-xl transition-all cursor-pointer flex items-center justify-between group ${
+                      idx === selectedIndex ? "bg-[#1A1A1A]" : "hover:bg-[#1A1A1A]"
+                    }`}
                   >
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
@@ -199,6 +347,7 @@ export function GlobalSearchDialog({
                         {item.category === "Messages" && <MessageSquare className="w-4 h-4" />}
                         {item.category === "Transactions" && <Receipt className="w-4 h-4" />}
                         {item.category === "Tasks" && <CheckSquare className="w-4 h-4" />}
+                        {item.category === "Modules & Pages" && <Layers className="w-4 h-4" />}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -234,7 +383,7 @@ export function GlobalSearchDialog({
                 </span>
               </div>
               <div className="flex items-center gap-1 text-emerald-400 font-medium">
-                <Sparkles className="w-3.5 h-3.5" /> Fast Unified Search
+                <Sparkles className="w-3.5 h-3.5" /> Live Workspace Search
               </div>
             </div>
           </motion.div>

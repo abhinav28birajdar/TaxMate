@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { createClient } from '@/utils/supabase/server';
+import { getServiceClient } from '@/lib/backend/supabase';
 
 let resend: Resend | null = null;
 
@@ -125,16 +125,29 @@ export async function sendEmailNotification(payload: EmailNotificationPayload) {
       html: htmlContent || `<p>Mail sent successfully</p>`,
     });
 
-    // Persist notification
-    const supabase = await createClient();
+    // Persist notification with valid DB notification_type enum value
+    const notificationTypeMap: Record<EmailNotificationPayload['type'], string> = {
+      TASK_ASSIGNED: 'TASK_ASSIGNED',
+      INVOICE_PAID: 'PAYMENT_RECEIVED',
+      APPOINTMENT_REMINDER: 'appointment_reminder',
+      MESSAGE: 'MESSAGE_RECEIVED',
+      DOCUMENT_READY: 'DOCUMENT_VERIFIED',
+      PAYMENT_DUE: 'payment_due',
+      CUSTOM: 'SYSTEM',
+    };
+    const dbType = notificationTypeMap[payload.type] || 'SYSTEM';
+
+    const supabase = getServiceClient();
     const { data: notification, error: dbError } = await supabase
       .from('notifications')
       .insert({
         user_id: payload.userId,
         title: payload.subject,
         message: htmlContent || 'Email sent',
-        type: payload.type,
+        type: dbType,
         channel: 'EMAIL',
+        read: false,
+        is_read: false,
         metadata: payload.metadata,
         created_at: new Date().toISOString(),
       })
